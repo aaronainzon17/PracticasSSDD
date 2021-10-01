@@ -11,6 +11,7 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"trabajo1/src/com"
@@ -45,6 +46,13 @@ func FindPrimes(interval com.TPInterval) (primes []int) {
 	return primes
 }
 
+func IntToBytes(i int) []byte {
+	return big.NewInt(int64(i)).Bytes()
+}
+func BytesToInt(b []byte) int {
+	return int(big.NewInt(0).SetBytes(b[:len(b)]).Int64())
+}
+
 const (
 	CONN_HOST = "localhost"
 	CONN_PORT = "2000"
@@ -62,17 +70,19 @@ func main() {
 
 	// TO DO
 	// Make a buffer to hold incoming data.
-	buf := make([]byte, 1024)
-	//for {
-	_, err1 := conn.Read(buf)
+	buf := make([]byte, 8)
+
+	n, err1 := conn.Read(buf)
+	fmt.Println(n)
+	checkError(err1)
+	ini := BytesToInt(buf[0:])
+	fin := BytesToInt(buf[4:])
+	fmt.Printf("El valor de ini es %d y el de fin %d \n", ini, fin)
+	interval := com.TPInterval{ini, fin}
+	primes := FindPrimes(interval)
+
+	sizeOfSolve := 4 * len(primes)
+	_, _ = conn.Write(IntToBytes(sizeOfSolve))
 	checkError(err1)
 
-	fmt.Println(string(buf))
-	//interval := com.TPInterval{int(buf[2]), int(buf[3])}
-	//req := com.Request{int(buf[0]), interval}
-
-	_, _ = conn.Write([]byte("Message received."))
-	checkError(err1)
-
-	//}
 }
