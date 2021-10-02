@@ -15,7 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"trabajo1/src/com"
+	"trabajo1/src/ej2/com"
 )
 
 func checkError(err error) {
