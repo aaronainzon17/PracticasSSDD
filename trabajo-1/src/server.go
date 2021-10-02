@@ -11,7 +11,6 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 	"net"
 	"os"
 	"strconv"
@@ -48,13 +47,6 @@ func FindPrimes(interval com.TPInterval) (primes []int) {
 	return primes
 }
 
-func IntToBytes(i int) []byte {
-	return big.NewInt(int64(i)).Bytes()
-}
-func BytesToInt(b []byte) int {
-	return int(big.NewInt(0).SetBytes(b[:len(b)]).Int64())
-}
-
 const (
 	CONN_HOST = "localhost"
 	CONN_PORT = "2000"
@@ -70,16 +62,12 @@ func main() {
 	defer conn.Close()
 	checkError(err)
 
-	// TO DO
-	// Make a buffer to hold incoming data.
 	buf := make([]byte, 20)
 	_, err = conn.Read(buf)
 	checkError(err)
 	cad := string(buf)
-	//fmt.Println("el buffer guarda ", cad)
+
 	split := strings.Split(cad, "*")
-	//fmt.Println(split)
-	//fmt.Println("The length of the slice is:", len(split))
 
 	ints := make([]int, len(split))
 
@@ -88,10 +76,9 @@ func main() {
 		checkError(err)
 	}
 
-	//fmt.Printf("El valor de ini es %d y el de fin %d \n", ints[0], ints[1])
 	interval := com.TPInterval{ints[0], ints[1]}
 	primes := FindPrimes(interval)
-	//fmt.Println(primes)
+
 	sizePrimes := len(primes)
 	var primes2send string
 	if sizePrimes > 0 {
@@ -100,14 +87,12 @@ func main() {
 			primes2send += strconv.Itoa(primes[i]) + " "
 		}
 	}
+
 	fmt.Println(primes2send)
+
 	_, err = conn.Write([]byte((strconv.Itoa(len(primes2send))) + "*"))
 	checkError(err)
-	bufAck := make([]byte, 3)
-	_, err = conn.Read(bufAck)
+
+	_, err = conn.Write([]byte(primes2send))
 	checkError(err)
-	if string(bufAck) == "ack" {
-		_, err = conn.Write([]byte(primes2send))
-		checkError(err)
-	}
 }

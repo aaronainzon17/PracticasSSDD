@@ -9,8 +9,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"math/big"
 	"net"
 	"os"
 	"strconv"
@@ -24,13 +24,6 @@ func checkError(err error) {
 	}
 }
 
-func IntToBytes(i int) []byte {
-	return big.NewInt(int64(i)).Bytes()
-}
-func BytesToInt(b []byte) int {
-	return int(big.NewInt(0).SetBytes(b[:len(b)]).Int64())
-}
-
 func main() {
 	endpoint := "localhost:2000"
 
@@ -38,9 +31,10 @@ func main() {
 	var ini, fin string
 	fmt.Println("Enter an integer value : ")
 
+	//Se pide por pantalla el incio y fin del intervalo
 	_, err := fmt.Scanf("%s %s", &ini, &fin)
-	cad := ini + "*" + fin + "*"
-	fmt.Println("el buffer guarda ", cad)
+	interval := ini + "*" + fin + "*"
+
 	tcpAddr, err := net.ResolveTCPAddr("tcp", endpoint)
 	checkError(err)
 
@@ -49,21 +43,32 @@ func main() {
 
 	// la variable conn es de tipo *net.TCPconn
 	fmt.Printf("Connection established between %s and localhost.\n", endpoint)
-	_, err = conn.Write([]byte(cad))
+
+	//Se envia el intervalo
+	_, err = conn.Write([]byte(interval))
 	checkError(err)
+
+	//Se recibe el tamanyo del vector de primos
 	bufSizeOfSolve := make([]byte, 10)
 	_, err = conn.Read(bufSizeOfSolve)
 	checkError(err)
-	a := string(bufSizeOfSolve)
-	fmt.Println(a)
-	_, err = conn.Write([]byte("ack"))
-	checkError(err)
-	splits := strings.Split(a, "*")
+
+	splits := strings.Split(string(bufSizeOfSolve), "*")
 	intVar, err := strconv.Atoi(splits[0])
 	checkError(err)
-	fmt.Println(intVar)
+
+	//Recibe el vector de numeros primos calculados
 	sol := make([]byte, intVar)
 	_, err = conn.Read(sol)
 	checkError(err)
+
+	//Se crea un fichero donde se vuelca la salida
+	f, err := os.Create("./primes.txt")
+	checkError(err)
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	_, err = fmt.Fprintf(w, "%v\n", string(sol))
+
+	//Se muestra la solucion por pantalla
 	fmt.Println(string(sol))
 }
