@@ -14,6 +14,8 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"trabajo1/src/com"
 )
 
@@ -70,19 +72,42 @@ func main() {
 
 	// TO DO
 	// Make a buffer to hold incoming data.
-	buf := make([]byte, 8)
+	buf := make([]byte, 20)
+	_, err = conn.Read(buf)
+	checkError(err)
+	cad := string(buf)
+	//fmt.Println("el buffer guarda ", cad)
+	split := strings.Split(cad, "*")
+	//fmt.Println(split)
+	//fmt.Println("The length of the slice is:", len(split))
 
-	n, err1 := conn.Read(buf)
-	fmt.Println(n)
-	checkError(err1)
-	ini := BytesToInt(buf[0:])
-	fin := BytesToInt(buf[4:])
-	fmt.Printf("El valor de ini es %d y el de fin %d \n", ini, fin)
-	interval := com.TPInterval{ini, fin}
+	ints := make([]int, len(split))
+
+	for i := 0; i < len(split)-1; i++ {
+		ints[i], err = strconv.Atoi(split[i])
+		checkError(err)
+	}
+
+	//fmt.Printf("El valor de ini es %d y el de fin %d \n", ints[0], ints[1])
+	interval := com.TPInterval{ints[0], ints[1]}
 	primes := FindPrimes(interval)
-
-	sizeOfSolve := 4 * len(primes)
-	_, _ = conn.Write(IntToBytes(sizeOfSolve))
-	checkError(err1)
-
+	//fmt.Println(primes)
+	sizePrimes := len(primes)
+	var primes2send string
+	if sizePrimes > 0 {
+		primes2send = strconv.Itoa(primes[0]) + " "
+		for i := 1; i < sizePrimes; i++ {
+			primes2send += strconv.Itoa(primes[i]) + " "
+		}
+	}
+	fmt.Println(primes2send)
+	_, err = conn.Write([]byte((strconv.Itoa(len(primes2send))) + "*"))
+	checkError(err)
+	bufAck := make([]byte, 3)
+	_, err = conn.Read(bufAck)
+	checkError(err)
+	if string(bufAck) == "ack" {
+		_, err = conn.Write([]byte(primes2send))
+		checkError(err)
+	}
 }

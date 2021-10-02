@@ -13,7 +13,8 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"unsafe"
+	"strconv"
+	"strings"
 )
 
 func checkError(err error) {
@@ -34,13 +35,12 @@ func main() {
 	endpoint := "localhost:2000"
 
 	// TODO: crear el intervalo solicitando dos números por teclado
-	var ini, fin int
+	var ini, fin string
 	fmt.Println("Enter an integer value : ")
 
-	_, err := fmt.Scanf("%d %d", &ini, &fin)
-	fmt.Println(unsafe.Sizeof(int(0)))
-	//interval := com.TPInterval{ini, fin}
-	//req1 := com.Request{1, interval}
+	_, err := fmt.Scanf("%s %s", &ini, &fin)
+	cad := ini + "*" + fin + "*"
+	fmt.Println("el buffer guarda ", cad)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", endpoint)
 	checkError(err)
 
@@ -49,22 +49,21 @@ func main() {
 
 	// la variable conn es de tipo *net.TCPconn
 	fmt.Printf("Connection established between %s and localhost.\n", endpoint)
-	buf := make([]byte, 8)
-	buf = IntToBytes(ini)
-	buf = append(buf, IntToBytes(fin)...)
-	fmt.Println("el buffer guarda ", buf)
-	written, err := conn.Write(buf)
-	fmt.Printf("El numero de bytes escrito es %d \n", written)
+	_, err = conn.Write([]byte(cad))
 	checkError(err)
-	bufSizeOfSolve := make([]byte, 4)
-	_, err1 := conn.Read(bufSizeOfSolve)
-	checkError(err1)
-	size := BytesToInt(bufSizeOfSolve)
-	sol := make([]byte, size)
-	_, err2 := conn.Read(sol)
-	checkError(err2)
-	for i := 4; i < 10; i += 4 {
-		fmt.Println(BytesToInt((sol[i-4 : i])))
-	}
-
+	bufSizeOfSolve := make([]byte, 10)
+	_, err = conn.Read(bufSizeOfSolve)
+	checkError(err)
+	a := string(bufSizeOfSolve)
+	fmt.Println(a)
+	_, err = conn.Write([]byte("ack"))
+	checkError(err)
+	splits := strings.Split(a, "*")
+	intVar, err := strconv.Atoi(splits[0])
+	checkError(err)
+	fmt.Println(intVar)
+	sol := make([]byte, intVar)
+	_, err = conn.Read(sol)
+	checkError(err)
+	fmt.Println(string(sol))
 }
