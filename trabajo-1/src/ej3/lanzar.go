@@ -38,7 +38,7 @@ func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 
 func main() {
 
-	if (len(os.Args) != 5) && (len(os.Args) != 8) {
+	if (len(os.Args) != 5) && (len(os.Args) != 7) {
 		fmt.Println("WRONG USAGE")
 		fmt.Println("Usage: go run lanzar.go <client/server> <hostUser> <remoteUser> <server>")
 		os.Exit(1)
@@ -68,10 +68,9 @@ func main() {
 	if opt == "cliente" {
 		fmt.Println("Entra cliente")
 		//cd ~/trabajo-1/server/ && /usr/local/go/bin/go run server.go
-		server2 := os.Args[5]
-		ini := os.Args[6]
-		fin := os.Args[7]
-		result, err = runCmd("cd /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/ && /usr/local/go/bin/go run cliente.go "+server2+" "+ini+" "+fin, server, config)
+		ini := os.Args[5]
+		fin := os.Args[6]
+		result, err = runCmd("cd /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/ && /usr/local/go/bin/go run cliente.go "+ini+" "+fin, server, config)
 	} else if opt == "server" {
 		fmt.Println("Entra server")
 		result, err = runCmd("cd /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/ && /usr/local/go/bin/go run server.go &", server, config)

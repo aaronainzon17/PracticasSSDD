@@ -28,19 +28,16 @@ func main() {
 
 	// TODO: crear el intervalo solicitando dos números por teclado
 	//var ini, fin string
-	if len(os.Args) != 4 {
+	if len(os.Args) != 3 {
 		fmt.Println("WRONG USAGE")
 		fmt.Println("Use: cliente.go <server> <ini interval> <fin interval>")
 		os.Exit(1)
 	}
 
-	//Se pide por pantalla el incio y fin del intervalo
-	//_, err := fmt.Scanf("%s %s", &ini, &fin)
-	server := os.Args[1]
-	ini := os.Args[2]
-	fin := os.Args[3]
+	ini := os.Args[1]
+	fin := os.Args[2]
 	interval := ini + "*" + fin + "*"
-	endpoint := server + ":2000"
+	endpoint := "localhost:2000"
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", endpoint)
 	checkError(err)
