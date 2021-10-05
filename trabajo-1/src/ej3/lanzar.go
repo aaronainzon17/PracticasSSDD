@@ -68,10 +68,10 @@ func main() {
 	if opt == "cliente" {
 		fmt.Println("Entra cliente")
 		//cd ~/trabajo-1/server/ && /usr/local/go/bin/go run server.go
-		server := os.Args[5]
+		server2 := os.Args[5]
 		ini := os.Args[6]
 		fin := os.Args[7]
-		result, err = runCmd("cd /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/ && /usr/local/go/bin/go run cliente.go "+server+" "+ini+" "+fin, server, config)
+		result, err = runCmd("cd /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/ && /usr/local/go/bin/go run cliente.go "+server2+" "+ini+" "+fin, server, config)
 	} else if opt == "server" {
 		fmt.Println("Entra server")
 		result, err = runCmd("cd /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/ && /usr/local/go/bin/go run server.go &", server, config)
