@@ -60,8 +60,8 @@ func main() {
 			return nil
 		},
 	}
-
-	result, err := runCmd("go run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej3/lanzar.go ", client, config)
+	// /run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go "
+	result, err := runCmd("/usr/local/go/bin/go version", client, config)
 	checkError(err)
 
 	log.Println(result)
