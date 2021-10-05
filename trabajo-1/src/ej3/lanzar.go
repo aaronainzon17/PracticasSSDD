@@ -38,7 +38,7 @@ func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 
 func main() {
 
-	if len(os.Args) != 4 {
+	if len(os.Args) != 5 {
 		fmt.Println("WRONG USAGE")
 		fmt.Println("Usage: go run lanzar.go <client/server> <hostUser> <remoteUser> <server>")
 		os.Exit(1)
