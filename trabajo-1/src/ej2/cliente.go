@@ -9,7 +9,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"net"
 	"os"
@@ -27,7 +26,7 @@ func checkError(err error) {
 func main() {
 
 	// TODO: crear el intervalo solicitando dos números por teclado
-	//var ini, fin string
+
 	if len(os.Args) != 3 {
 		fmt.Println("WRONG USAGE")
 		fmt.Println("Use: cliente.go <server> <ini interval> <fin interval>")
@@ -65,16 +64,8 @@ func main() {
 
 	//Recibe el vector de numeros primos calculados
 	sol := make([]byte, intVar)
-	//fmt.Println(len(sol))
 	_, err = conn.Read(sol)
 	checkError(err)
-
-	//Se crea un fichero donde se vuelca la salida
-	f, err := os.Create("./primes.txt")
-	checkError(err)
-	defer f.Close()
-	w := bufio.NewWriter(f)
-	_, err = fmt.Fprintf(w, "%v\n", string(sol))
 
 	//Se muestra la solucion por pantalla
 	fmt.Println(string(sol))

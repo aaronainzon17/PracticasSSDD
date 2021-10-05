@@ -62,12 +62,10 @@ func main() {
 			return nil
 		},
 	}
-	// /run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go "
 	var result string
 	fmt.Println(opt)
 	if opt == "cliente" {
 		fmt.Println("Entra cliente")
-		//cd ~/trabajo-1/server/ && /usr/local/go/bin/go run server.go
 		ini := os.Args[5]
 		fin := os.Args[6]
 		result, err = runCmd("cd /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/ && /usr/local/go/bin/go run cliente.go "+ini+" "+fin, server, config)
