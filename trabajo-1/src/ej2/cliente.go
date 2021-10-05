@@ -62,9 +62,7 @@ func main() {
 	//Recibe el vector de numeros primos calculados
 	sol := make([]byte, intVar)
 	fmt.Println(len(sol))
-	n, err := conn.Read(sol)
-	fmt.Printf("se han leido %d bytes \n", n)
-
+	_, err = conn.Read(sol)
 	checkError(err)
 
 	//Se crea un fichero donde se vuelca la salida
