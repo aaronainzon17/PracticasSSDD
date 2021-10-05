@@ -38,22 +38,23 @@ func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 
 func main() {
 
-	if len(os.Args) != 3 {
+	if len(os.Args) != 4 {
 		fmt.Println("WRONG USAGE")
-		fmt.Println("Usage: go run lanzar.go <username> <client>")
+		fmt.Println("Usage: go run lanzar.go <hostUser> <remoteUser> <server>")
 		os.Exit(1)
 	}
 
-	username := os.Args[1]
-	client := os.Args[2]
+	hostUser := os.Args[1]
+	remoteUser := os.Args[2]
+	server := os.Args[3]
 
-	pemBytes, err := ioutil.ReadFile("/home/" + "aaron" + "/.ssh/id_rsa")
+	pemBytes, err := ioutil.ReadFile("/home/" + hostUser + "/.ssh/id_rsa")
 	checkError(err)
 	signer, err := ssh.ParsePrivateKey(pemBytes)
 	checkError(err)
 
 	config := &ssh.ClientConfig{
-		User: username,
+		User: remoteUser,
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			// use OpenSSH's known_hosts file if you care about host validation
@@ -61,7 +62,7 @@ func main() {
 		},
 	}
 	// /run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go "
-	result, err := runCmd("/usr/local/go/bin/go version", client, config)
+	result, err := runCmd("/usr/local/go/bin/go version", server, config)
 	checkError(err)
 
 	log.Println(result)
