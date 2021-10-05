@@ -64,7 +64,6 @@ func main() {
 	// /run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go "
 	_, err = runCmd("/usr/local/go/bin/go run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/server.go &; /usr/local/go/bin/go run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go", server, config)
 	checkError(err)
-	result, err := runCmd("", server, config)
 	checkError(err)
 
 	log.Println(result)
