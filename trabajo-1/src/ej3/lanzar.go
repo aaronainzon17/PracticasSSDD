@@ -64,10 +64,17 @@ func main() {
 	}
 	// /run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go "
 	var result string
-	if opt == "client" {
-		result, err = runCmd("/usr/local/go/bin/go run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go", server, config)
-	} else {
-		result, err = runCmd("/usr/local/go/bin/go run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/server.go", server, config)
+	fmt.Println(opt)
+	if opt == "cliente" {
+		fmt.Println("Entra cliente")
+		//cd ~/trabajo-1/server/ && /usr/local/go/bin/go run server.go
+		server := os.Args[5]
+		ini := os.Args[6]
+		fin := os.Args[7]
+		result, err = runCmd("cd /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/ && /usr/local/go/bin/go run cliente.go "+server+" "+ini+" "+fin, server, config)
+	} else if opt == "server" {
+		fmt.Println("Entra server")
+		result, err = runCmd("cd /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/ && /usr/local/go/bin/go run server.go &", server, config)
 	}
 	checkError(err)
 	log.Println(result)
