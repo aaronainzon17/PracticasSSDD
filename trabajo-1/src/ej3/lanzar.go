@@ -40,13 +40,14 @@ func main() {
 
 	if len(os.Args) != 4 {
 		fmt.Println("WRONG USAGE")
-		fmt.Println("Usage: go run lanzar.go <hostUser> <remoteUser> <server>")
+		fmt.Println("Usage: go run lanzar.go <client/server> <hostUser> <remoteUser> <server>")
 		os.Exit(1)
 	}
 
-	hostUser := os.Args[1]
-	remoteUser := os.Args[2]
-	server := os.Args[3]
+	opt := os.Args[1]
+	hostUser := os.Args[2]
+	remoteUser := os.Args[3]
+	server := os.Args[4]
 
 	pemBytes, err := ioutil.ReadFile("/home/" + hostUser + "/.ssh/id_rsa")
 	checkError(err)
@@ -62,9 +63,12 @@ func main() {
 		},
 	}
 	// /run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go "
-	result, err := runCmd("/usr/local/go/bin/go run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/server.go &; /usr/local/go/bin/go run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go", server, config)
+	var result string
+	if opt == "client" {
+		result, err = runCmd("/usr/local/go/bin/go run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/cliente.go", server, config)
+	} else {
+		result, err = runCmd("/usr/local/go/bin/go run /home/a779088/cuarto/PracticasSSDD/trabajo-1/src/ej2/server.go", server, config)
+	}
 	checkError(err)
-	checkError(err)
-
 	log.Println(result)
 }
