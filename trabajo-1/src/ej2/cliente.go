@@ -52,14 +52,19 @@ func main() {
 	bufSizeOfSolve := make([]byte, 10)
 	_, err = conn.Read(bufSizeOfSolve)
 	checkError(err)
-
+	_, err = conn.Write([]byte("ack"))
+	checkError(err)
 	splits := strings.Split(string(bufSizeOfSolve), "*")
 	intVar, err := strconv.Atoi(splits[0])
+
 	checkError(err)
 
 	//Recibe el vector de numeros primos calculados
 	sol := make([]byte, intVar)
-	_, err = conn.Read(sol)
+	fmt.Println(len(sol))
+	n, err := conn.Read(sol)
+	fmt.Printf("se han leido %d bytes \n", n)
+
 	checkError(err)
 
 	//Se crea un fichero donde se vuelca la salida

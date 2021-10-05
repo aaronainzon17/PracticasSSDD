@@ -89,10 +89,15 @@ func main() {
 	}
 
 	fmt.Println(primes2send)
-
 	_, err = conn.Write([]byte((strconv.Itoa(len(primes2send))) + "*"))
 	checkError(err)
 
-	_, err = conn.Write([]byte(primes2send))
+	bufAck := make([]byte, 3)
+	_, err = conn.Read(bufAck)
 	checkError(err)
+
+	if string(bufAck) == "ack" {
+		_, err = conn.Write([]byte(primes2send))
+		checkError(err)
+	}
 }
