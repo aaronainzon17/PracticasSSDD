@@ -29,7 +29,7 @@ func main() {
 
 	if len(os.Args) != 3 {
 		fmt.Println("WRONG USAGE")
-		fmt.Println("Use: cliente.go <server> <ini interval> <fin interval>")
+		fmt.Println("Use: cliente.go <ini interval> <fin interval>")
 		os.Exit(1)
 	}
 
