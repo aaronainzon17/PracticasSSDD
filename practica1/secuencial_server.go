@@ -12,8 +12,8 @@
 * varias peticiones, atiende una de ellas (a menudo la primera en llegar) y, una vez
 * terminada, atiende la siguiente. Para reducir el tiempo de espera de los clientes,
 * siempre que haya recursos hardware suficientes en el servidor y siempre que la apli-
-* caci ́on lo permita, se puede utilizar la arquitectura cliente-servidor concurrente
-*/
+* caci ́on lo permita, sse puede utilizar la arquitectura cliente-servidor concurrente
+ */
 package main
 
 import (
@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"io"
-	"./com"
+
+	"p1/com"
 )
 
 func checkError(err error) {
@@ -57,22 +57,27 @@ func FindPrimes(interval com.TPInterval) (primes []int) {
 func main() {
 
 	CONN_TYPE := "tcp"
-	CONN_HOST := "127.0.0.1"
-	CONN_PORT := 30000
+	CONN_HOST := "localhost"
+	CONN_PORT := "30000"
 
 	listener, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 	checkError(err)
 
-	conn, err := listener.Accept()
-	defer conn.Close()
-	checkError(err)
+	for {
+		conn, err := listener.Accept()
+		checkError(err)
+		encoder := gob.NewEncoder(conn)
+		decoder := gob.NewDecoder(conn)
+		defer conn.Close()
+		var interval com.Request
+		decoder.Decode(&interval)
+		id := interval.Id
+		var primes com.Reply
+		primes.Id = id
+		primes.Primes = FindPrimes(interval.Interval)
+		fmt.Println(primes.Id)
+		fmt.Println(primes.Primes)
+		encoder.Encode(primes)
 
-	encoder := gob.NewEncoder(conn)
-	decoder := gob.NewDecoder(conn)
-
-	
-
-	
-
-    // TO DO
+	}
 }
