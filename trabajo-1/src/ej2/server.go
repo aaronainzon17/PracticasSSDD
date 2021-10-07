@@ -10,11 +10,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
-	"strconv"
-	"strings"
 	"trabajo1/src/ej2/com"
 )
 
@@ -62,42 +61,38 @@ func main() {
 	defer conn.Close()
 	checkError(err)
 
-	buf := make([]byte, 20)
-	_, err = conn.Read(buf)
+	intervalRead := make([]byte, 8)
+	_, err = conn.Read(intervalRead)
 	checkError(err)
-	cad := string(buf)
 
-	split := strings.Split(cad, "*")
-
-	ints := make([]int, len(split))
-
-	for i := 0; i < len(split)-1; i++ {
-		ints[i], err = strconv.Atoi(split[i])
-		checkError(err)
-	}
-
-	interval := com.TPInterval{ints[0], ints[1]}
+	ini := int(binary.LittleEndian.Uint32(intervalRead[0:4]))
+	fin := int(binary.LittleEndian.Uint32(intervalRead[4:8]))
+	fmt.Printf("El intervalo recibido es %d, %d \n", ini, fin)
+	interval := com.TPInterval{ini, fin}
 	primes := FindPrimes(interval)
+	fmt.Println(primes)
 
+	//Tamanyo del array de primos
 	sizePrimes := len(primes)
-	var primes2send string
+
+	//Buffer para almacenar cada numero en bytes
+	num := make([]byte, 4)
+	binary.LittleEndian.PutUint32(num, uint32(sizePrimes*4))
+
+	//Se manda el tamaño del vector de bytes
+	_, err = conn.Write(num)
+	checkError(err)
+
+	//Se crea un buffer para enviar el intervalo
+	var sol []byte
 	if sizePrimes > 0 {
-		primes2send = strconv.Itoa(primes[0]) + " "
-		for i := 1; i < sizePrimes; i++ {
-			primes2send += strconv.Itoa(primes[i]) + " "
+		for i := 0; i < sizePrimes; i++ {
+			binary.LittleEndian.PutUint32(num, uint32(primes[i]))
+			sol = append(sol, num...)
 		}
 	}
-
-	fmt.Println(primes2send)
-	_, err = conn.Write([]byte((strconv.Itoa(len(primes2send))) + "*"))
+	//fmt.Println(sol)
+	n1, err := conn.Write(sol)
+	fmt.Printf("se escriben %d bytes \n", n1)
 	checkError(err)
-
-	bufAck := make([]byte, 3)
-	_, err = conn.Read(bufAck)
-	checkError(err)
-
-	if string(bufAck) == "ack" {
-		_, err = conn.Write([]byte(primes2send))
-		checkError(err)
-	}
 }

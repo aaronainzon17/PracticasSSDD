@@ -9,11 +9,11 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
 	"strconv"
-	"strings"
 )
 
 func checkError(err error) {
@@ -24,8 +24,7 @@ func checkError(err error) {
 }
 
 func main() {
-
-	// TODO: crear el intervalo solicitando dos números por teclado
+	endpoint := "localhost:2000"
 
 	if len(os.Args) != 3 {
 		fmt.Println("WRONG USAGE")
@@ -33,10 +32,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	ini := os.Args[1]
-	fin := os.Args[2]
-	interval := ini + "*" + fin + "*"
-	endpoint := "localhost:2000"
+	ini, err := strconv.Atoi(os.Args[1])
+	checkError(err)
+	fin, err := strconv.Atoi(os.Args[2])
+	checkError(err)
+	//Buffer para almacenar cada numero en bytes
+	num := make([]byte, 4)
+
+	//Se crea un buffer para enviar el intervalo
+	var interval []byte
+	binary.LittleEndian.PutUint32(num, uint32(ini))
+	interval = append(interval, num...)
+	binary.LittleEndian.PutUint32(num, uint32(fin))
+	interval = append(interval, num...)
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", endpoint)
 	checkError(err)
@@ -48,25 +56,26 @@ func main() {
 	fmt.Printf("Connection established between %s and localhost.\n", endpoint)
 
 	//Se envia el intervalo
-	_, err = conn.Write([]byte(interval))
+	_, err = conn.Write(interval)
 	checkError(err)
 
 	//Se recibe el tamanyo del vector de primos
 	bufSizeOfSolve := make([]byte, 10)
 	_, err = conn.Read(bufSizeOfSolve)
 	checkError(err)
-	_, err = conn.Write([]byte("ack"))
-	checkError(err)
-	splits := strings.Split(string(bufSizeOfSolve), "*")
-	intVar, err := strconv.Atoi(splits[0])
-
-	checkError(err)
+	intVar := int(binary.LittleEndian.Uint32(bufSizeOfSolve[0:4]))
 
 	//Recibe el vector de numeros primos calculados
 	sol := make([]byte, intVar)
 	_, err = conn.Read(sol)
 	checkError(err)
 
+	var resultado []int
+	var n int
+	for i := 0; i < intVar; i += 4 {
+		n = int(binary.LittleEndian.Uint32(sol[i : i+4]))
+		resultado = append(resultado, n)
+	}
 	//Se muestra la solucion por pantalla
-	fmt.Println(string(sol))
+	fmt.Println(resultado)
 }
