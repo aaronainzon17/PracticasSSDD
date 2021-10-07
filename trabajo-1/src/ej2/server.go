@@ -91,7 +91,7 @@ func main() {
 			sol = append(sol, num...)
 		}
 	}
-	//fmt.Println(sol)
+	fmt.Println(sol)
 	n1, err := conn.Write(sol)
 	fmt.Printf("se escriben %d bytes \n", n1)
 	checkError(err)
