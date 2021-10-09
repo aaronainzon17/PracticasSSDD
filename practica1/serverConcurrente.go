@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/gob"
 	"fmt"
 	"net"
 	"os"
@@ -36,14 +37,40 @@ func FindPrimes(interval com.TPInterval) (primes []int) {
 	return primes
 }
 
+const (
+	CONN_HOST = "localhost"
+	CONN_TYPE = "tcp"
+	CONN_PORT = "30000"
+)
+
+func handleConnexion(conn net.Conn) {
+	// close connection on exit
+	defer conn.Close()
+	var reply com.Request
+	encoder := gob.NewEncoder(conn)
+	decoder := gob.NewDecoder(conn)
+	for {
+		//Se almacena en la variable reply el objeto de tipo request
+		err := decoder.Decode(&reply)
+		checkError(err)
+		//Se calculan los primos del intervalo
+		primes := FindPrimes(reply.Interval)
+		//Se crea un objeto de tipo com.Reply y se envia al cliente
+		solution := com.Reply{reply.Id, primes}
+		encoder.Encode(solution)
+	}
+
+}
+
 func main() {
 
 	listener, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 	checkError(err)
 
-	conn, err := listener.Accept()
-	defer conn.Close()
-	checkError(err)
+	for {
+		conn, err := listener.Accept()
+		checkError(err)
+		go handleConnexion(conn)
+	}
 
-	// TO DO
 }
