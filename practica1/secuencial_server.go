@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	"p1/com"
 )
@@ -65,17 +66,22 @@ func main() {
 
 	for {
 		conn, err := listener.Accept()
-		defer conn.Close()
+
 		checkError(err)
 		encoder := gob.NewEncoder(conn)
 		decoder := gob.NewDecoder(conn)
 		var interval com.Request
 		decoder.Decode(&interval)
-		id := interval.Id
-		var primes com.Reply
-		primes.Id = id
-		primes.Primes = FindPrimes(interval.Interval)
-		fmt.Println(primes.Id)
+
+		start := time.Now()
+		p := FindPrimes(interval.Interval)
+		primes := com.Reply{interval.Id, p}
+		end := time.Now()
+		texec := end.Sub(start)
+
 		encoder.Encode(primes)
+		fmt.Println("Tiempo ejecucion: ", texec)
+
+		defer conn.Close()
 	}
 }

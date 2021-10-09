@@ -9,6 +9,12 @@ import (
 	"time"
 )
 
+//Objeto con el intervalo de primos y la conexion
+type Params struct {
+	interval com.Request
+	conn     net.Conn
+}
+
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
@@ -44,38 +50,52 @@ const (
 	CONN_PORT = "30000"
 )
 
-func handleConnexion(conn net.Conn) {
-	// close connection on exit
-	defer conn.Close()
-	var reply com.Request
-	encoder := gob.NewEncoder(conn)
-	decoder := gob.NewDecoder(conn)
+func handleConnexion(ch chan Params) {
+
 	for {
-		//Se almacena en la variable reply el objeto de tipo request
-		err := decoder.Decode(&reply)
-		checkError(err)
+		p := <-ch // Recube un tabajo del canal
+		conn := p.conn
+		encoder := gob.NewEncoder(conn)
 		start := time.Now()
 		//Se calculan los primos del intervalo
-		primes := FindPrimes(reply.Interval)
+		primes := FindPrimes(p.interval.Interval)
 		end := time.Now()
 		texec := end.Sub(start)
 		//Se crea un objeto de tipo com.Reply y se envia al cliente
-		solution := com.Reply{reply.Id, primes}
+		solution := com.Reply{p.interval.Id, primes}
 		encoder.Encode(solution)
 		fmt.Println("Tiempo de ejecucion: ", texec)
+		// close connection on exit
+		defer conn.Close()
 	}
-
 }
 
 func main() {
 
 	listener, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 	checkError(err)
+	//Se crea un canal y se lanzan las gorutines
+	ch := make(chan Params)
+	for i := 0; i < 4; i++ {
+		go handleConnexion(ch)
+	}
 
+	var interval com.Request
+	var hcArgs Params
 	for {
 		conn, err := listener.Accept()
 		checkError(err)
-		go handleConnexion(conn)
+
+		decoder := gob.NewDecoder(conn)
+
+		err = decoder.Decode(&interval)
+		checkError(err)
+
+		hcArgs.conn = conn
+		hcArgs.interval = interval
+
+		ch <- hcArgs //lanza trabajo sobre la pool de Goroutines
+
 	}
 
 }
