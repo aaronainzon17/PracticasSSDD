@@ -65,10 +65,10 @@ func main() {
 
 	for {
 		conn, err := listener.Accept()
+		defer conn.Close()
 		checkError(err)
 		encoder := gob.NewEncoder(conn)
 		decoder := gob.NewDecoder(conn)
-		defer conn.Close()
 		var interval com.Request
 		decoder.Decode(&interval)
 		id := interval.Id
@@ -76,8 +76,6 @@ func main() {
 		primes.Id = id
 		primes.Primes = FindPrimes(interval.Interval)
 		fmt.Println(primes.Id)
-		fmt.Println(primes.Primes)
 		encoder.Encode(primes)
-
 	}
 }
