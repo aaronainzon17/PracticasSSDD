@@ -1,3 +1,8 @@
+/*
+* AUTOR: Angel Espinosa (775750), Aaron Ibañez (779088)
+*
+*
+ */
 package main
 
 import (
@@ -45,25 +50,26 @@ const (
 )
 
 func handleConnexion(conn net.Conn) {
-	// close connection on exit
+
 	defer conn.Close()
+
 	var reply com.Request
 	encoder := gob.NewEncoder(conn)
 	decoder := gob.NewDecoder(conn)
-	for {
-		//Se almacena en la variable reply el objeto de tipo request
-		err := decoder.Decode(&reply)
-		checkError(err)
-		start := time.Now()
-		//Se calculan los primos del intervalo
-		primes := FindPrimes(reply.Interval)
-		end := time.Now()
-		texec := end.Sub(start)
-		//Se crea un objeto de tipo com.Reply y se envia al cliente
-		solution := com.Reply{reply.Id, primes}
-		encoder.Encode(solution)
-		fmt.Println("Tiempo de ejecucion: ", texec)
-	}
+
+	//Se almacena en la variable reply el objeto de tipo request
+	err := decoder.Decode(&reply)
+	checkError(err)
+	start := time.Now()
+	//Se calculan los primos del intervalo
+	primes := FindPrimes(reply.Interval)
+	end := time.Now()
+	texec := end.Sub(start)
+	//Se crea un objeto de tipo com.Reply y se envia al cliente
+	solution := com.Reply{reply.Id, primes}
+	fmt.Println(reply.Id)
+	encoder.Encode(solution)
+	fmt.Println("Tiempo de ejecucion: ", texec)
 
 }
 
@@ -77,5 +83,4 @@ func main() {
 		checkError(err)
 		go handleConnexion(conn)
 	}
-
 }

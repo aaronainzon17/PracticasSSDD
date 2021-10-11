@@ -1,12 +1,6 @@
 /*
-* AUTOR: Rafael Tolosana Calasanz
-* ASIGNATURA: 30221 Sistemas Distribuidos del Grado en Ingeniería Informática
-*			Escuela de Ingeniería y Arquitectura - Universidad de Zaragoza
-* FECHA: septiembre de 2021
-* FICHERO: server.go
-* DESCRIPCIÓN: contiene la funcionalidad esencial para realizar los servidores
-*				correspondientes a la práctica 1
-
+* AUTOR: Angel Espinosa (775750), Aaron Ibañez (779088)
+*
 * La arquitectura cliente servidor secuencial consiste en un servidor que atien-
 * de peticiones de forma secuencial, de una en una, de manera que cuando llegan
 * varias peticiones, atiende una de ellas (a menudo la primera en llegar) y, una vez
@@ -64,14 +58,17 @@ func main() {
 	listener, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 	checkError(err)
 
+	var interval com.Request
+
 	for {
 		conn, err := listener.Accept()
-
 		checkError(err)
+
 		encoder := gob.NewEncoder(conn)
 		decoder := gob.NewDecoder(conn)
-		var interval com.Request
-		decoder.Decode(&interval)
+
+		err = decoder.Decode(&interval)
+		checkError(err)
 
 		start := time.Now()
 		p := FindPrimes(interval.Interval)
@@ -79,9 +76,11 @@ func main() {
 		end := time.Now()
 		texec := end.Sub(start)
 
-		encoder.Encode(primes)
+		err = encoder.Encode(primes)
+		checkError(err)
+
 		fmt.Println("Tiempo ejecucion: ", texec)
 
-		defer conn.Close()
+		conn.Close()
 	}
 }

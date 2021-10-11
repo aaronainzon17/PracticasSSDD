@@ -1,3 +1,8 @@
+/*
+* AUTOR: Angel Espinosa (775750), Aaron Ibañez (779088)
+*
+*
+ */
 package main
 
 import (
@@ -66,7 +71,7 @@ func handleConnexion(ch chan Params) {
 		encoder.Encode(solution)
 		fmt.Println("Tiempo de ejecucion: ", texec)
 		// close connection on exit
-		defer conn.Close()
+		conn.Close()
 	}
 }
 
@@ -76,12 +81,13 @@ func main() {
 	checkError(err)
 	//Se crea un canal y se lanzan las gorutines
 	ch := make(chan Params)
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 9; i++ {
 		go handleConnexion(ch)
 	}
 
 	var interval com.Request
 	var hcArgs Params
+
 	for {
 		conn, err := listener.Accept()
 		checkError(err)
@@ -94,8 +100,7 @@ func main() {
 		hcArgs.conn = conn
 		hcArgs.interval = interval
 
-		ch <- hcArgs //lanza trabajo sobre la pool de Goroutines
-
+		ch <- hcArgs //anyade el trabajo al canal (pool de Gorutines)
 	}
 
 }
