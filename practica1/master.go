@@ -15,15 +15,11 @@ import (
 	"bufio"
 	"encoding/gob"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"p1/com"
-	"strings"
 	"time"
-
-	"golang.org/x/crypto/ssh"
 )
 
 //Objeto con el intervalo de primos y la conexion
@@ -40,9 +36,12 @@ func checkError(err error) {
 }
 
 func workerControl(ch chan Params, workerIp string) {
+	fmt.Println("Entra a workerControl")
 	for {
+		fmt.Println("Entra al bucle")
 		var reply com.Reply
-		job := <-ch            // Recibe un tabajo del canal
+		job := <-ch // Recibe un tabajo del canal
+		fmt.Println(job)
 		clientConn := job.conn // Conexion al cliente
 
 		start := time.Now() // Se inicia el contador de tiempo
@@ -51,24 +50,23 @@ func workerControl(ch chan Params, workerIp string) {
 		tcpAddr, err := net.ResolveTCPAddr("tcp", workerIp)
 		checkError(err)
 		workerConn, err := net.DialTCP("tcp", nil, tcpAddr)
-		//defer workerConn.Close()
+		defer workerConn.Close()
 		checkError(err)
 
 		workerEnc := gob.NewEncoder(workerConn)
 		workerDec := gob.NewDecoder(workerConn)
+		clientEnc := gob.NewEncoder(clientConn)
 
 		err = workerEnc.Encode(job.interval)
 		checkError(err)
-
+		fmt.Println("Llega un trabajo")
 		err = workerDec.Decode(&reply)
 		checkError(err)
 
-		workerConn.Close()
-
 		end := time.Now()
 		texec := end.Sub(start)
-		clientEnc := gob.NewEncoder(clientConn)
 
+		fmt.Println("Va a mandar a cliente")
 		err = clientEnc.Encode(reply)
 		checkError(err)
 
@@ -98,11 +96,10 @@ func readFile(path string) []string {
 	return workers
 }
 
-func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
+/*func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 	// open connection
 	conn, err := ssh.Dial("tcp", client+":22", s)
 	checkError(err)
-	defer conn.Close()
 
 	// open session
 	session, err := conn.NewSession()
@@ -111,6 +108,7 @@ func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 
 	// run command and capture stdout/stderr
 	output, err := session.CombinedOutput(cmd)
+	conn.Close()
 
 	return fmt.Sprintf("%s", output), err
 }
@@ -131,10 +129,10 @@ func sshWorkerUp(worker string) (string, error) {
 	}
 	res1 := strings.Split(worker, ":")
 	fmt.Println(res1[0])
-	res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go localhost:30003", res1[0], config)
+	res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker, res1[0], config)
 	return res, err
 }
-
+*/
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file>\n")
@@ -145,35 +143,38 @@ func main() {
 	//Se leen las ip y puerto de fichero
 	workers := readFile(os.Args[2])
 
+	//Se crea un canal y se lanzan las gorutines
+	ch := make(chan Params)
+	var interval com.Request
+	var hcArgs Params
+
 	listener, err := net.Listen("tcp", ip)
 	checkError(err)
 
-	//Se crea un canal y se lanzan las gorutines
-	ch := make(chan Params)
 	for i := range workers {
-		res, err := sshWorkerUp(workers[i])
-		checkError(err)
-		fmt.Println(res)
+		//res, err := sshWorkerUp(workers[i])
+		//checkError(err)
+		//fmt.Println(res)
 		go workerControl(ch, workers[i])
 		fmt.Println("connecting to", workers[i])
 	}
 
-	var interval com.Request
-	var hcArgs Params
+	fmt.Println("llega al for")
 
 	for {
-		fmt.Println("Nose")
 		conn, err := listener.Accept()
 		checkError(err)
+		fmt.Println("Pasa accept")
 
 		decoder := gob.NewDecoder(conn)
 
 		err = decoder.Decode(&interval)
 		checkError(err)
-
+		fmt.Println("Decodea del cliente")
 		hcArgs.conn = conn
 		hcArgs.interval = interval
-
+		fmt.Println("Mete al canal y se loquea")
 		ch <- hcArgs //anyade el trabajo al canal (pool de Gorutines)
+		fmt.Println("Se desbloquea del canal")
 	}
 }
