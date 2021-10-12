@@ -15,11 +15,15 @@ import (
 	"bufio"
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"p1/com"
+	"strings"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 //Objeto con el intervalo de primos y la conexion
@@ -96,10 +100,11 @@ func readFile(path string) []string {
 	return workers
 }
 
-/*func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
+func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 	// open connection
 	conn, err := ssh.Dial("tcp", client+":22", s)
 	checkError(err)
+	defer conn.Close()
 
 	// open session
 	session, err := conn.NewSession()
@@ -108,13 +113,12 @@ func readFile(path string) []string {
 
 	// run command and capture stdout/stderr
 	output, err := session.CombinedOutput(cmd)
-	conn.Close()
 
 	return fmt.Sprintf("%s", output), err
 }
 
 func sshWorkerUp(worker string) (string, error) {
-	pemBytes, err := ioutil.ReadFile("/home/" + "aaron" + "/.ssh/id_rsa")
+	pemBytes, err := ioutil.ReadFile("/home/aaron/.ssh/id_rsa")
 	checkError(err)
 	signer, err := ssh.ParsePrivateKey(pemBytes)
 	checkError(err)
@@ -129,17 +133,22 @@ func sshWorkerUp(worker string) (string, error) {
 	}
 	res1 := strings.Split(worker, ":")
 	fmt.Println(res1[0])
-	res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker, res1[0], config)
+	fmt.Println(worker)
+	fmt.Println("Comando:")
+	fmt.Println("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker+" &", res1[0])
+	res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker+" &", res1[0], config)
+	fmt.Println("Sale ssh")
+	//res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker+" &", res1[0], config)
 	return res, err
 }
-*/
+
 func main() {
 	if len(os.Args) < 3 {
 		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file>\n")
 		os.Exit(1)
 	}
 	//Ip y pueto del worker
-	ip := os.Args[1]
+	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
 	workers := readFile(os.Args[2])
 
@@ -148,13 +157,13 @@ func main() {
 	var interval com.Request
 	var hcArgs Params
 
-	listener, err := net.Listen("tcp", ip)
+	listener, err := net.Listen("tcp", ipPort)
 	checkError(err)
 
 	for i := range workers {
-		//res, err := sshWorkerUp(workers[i])
-		//checkError(err)
-		//fmt.Println(res)
+		res, err := sshWorkerUp(workers[i])
+		checkError(err)
+		fmt.Println(res)
 		go workerControl(ch, workers[i])
 		fmt.Println("connecting to", workers[i])
 	}

@@ -60,7 +60,7 @@ func main() {
 		fmt.Fprint(os.Stderr, "Usage go run worker.go ip:port\n")
 		os.Exit(1)
 	}
-
+	fmt.Println("Entra al worker")
 	worker_dir := os.Args[1]
 
 	listener, err := net.Listen("tcp", worker_dir)
