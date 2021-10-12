@@ -12,13 +12,18 @@
 package main
 
 import (
+	"bufio"
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"p1/com"
-	"strconv"
+	"strings"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 //Objeto con el intervalo de primos y la conexion
@@ -46,7 +51,7 @@ func workerControl(ch chan Params, workerIp string) {
 		tcpAddr, err := net.ResolveTCPAddr("tcp", workerIp)
 		checkError(err)
 		workerConn, err := net.DialTCP("tcp", nil, tcpAddr)
-		defer workerConn.Close()
+		//defer workerConn.Close()
 		checkError(err)
 
 		workerEnc := gob.NewEncoder(workerConn)
@@ -58,6 +63,8 @@ func workerControl(ch chan Params, workerIp string) {
 		err = workerDec.Decode(&reply)
 		checkError(err)
 
+		workerConn.Close()
+
 		end := time.Now()
 		texec := end.Sub(start)
 		clientEnc := gob.NewEncoder(clientConn)
@@ -65,30 +72,89 @@ func workerControl(ch chan Params, workerIp string) {
 		err = clientEnc.Encode(reply)
 		checkError(err)
 
-		fmt.Println("Tiempo de ejecucion: ", texec)
+		fmt.Println("Tiempo de ejecucion: \n", texec)
 
 		// close connection on exit
 		clientConn.Close()
 	}
 }
 
+func readFile(path string) []string {
+	fmt.Println("entra a leer el fichero ", path)
+
+	f, err := os.Open(path)
+	checkError(err)
+
+	var workers []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		workers = append(workers, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	f.Close()
+	return workers
+}
+
+func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
+	// open connection
+	conn, err := ssh.Dial("tcp", client+":22", s)
+	checkError(err)
+	defer conn.Close()
+
+	// open session
+	session, err := conn.NewSession()
+	checkError(err)
+	defer session.Close()
+
+	// run command and capture stdout/stderr
+	output, err := session.CombinedOutput(cmd)
+
+	return fmt.Sprintf("%s", output), err
+}
+
+func sshWorkerUp(worker string) (string, error) {
+	pemBytes, err := ioutil.ReadFile("/home/" + "aaron" + "/.ssh/id_rsa")
+	checkError(err)
+	signer, err := ssh.ParsePrivateKey(pemBytes)
+	checkError(err)
+
+	config := &ssh.ClientConfig{
+		User: "a779088",
+		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			// use OpenSSH's known_hosts file if you care about host validation
+			return nil
+		},
+	}
+	res1 := strings.Split(worker, ":")
+	res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker, res1[0], config)
+	return res, err
+}
+
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <nWorkers> [workeriIP:porti]\n")
+	if len(os.Args) < 3 {
+		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file>\n")
 		os.Exit(1)
 	}
+	//Ip y pueto del worker
 	ip := os.Args[1]
-	nWorkers, err := strconv.Atoi(os.Args[2])
-	checkError(err)
+	//Se leen las ip y puerto de fichero
+	workers := readFile(os.Args[2])
+
 	listener, err := net.Listen("tcp", ip)
 	checkError(err)
 
 	//Se crea un canal y se lanzan las gorutines
 	ch := make(chan Params)
-	for i := 0; i < nWorkers; i++ {
-		a := "localhost:" + strconv.Itoa((30000 + i))
-		go workerControl(ch, a)
-		fmt.Println("connecting to", a)
+	for i := range workers {
+		res, err := sshWorkerUp(workers[i])
+		checkError(err)
+		fmt.Println(res)
+		go workerControl(ch, workers[i])
+		//fmt.Println("connecting to", workers[i])
 	}
 
 	var interval com.Request

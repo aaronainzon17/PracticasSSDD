@@ -67,7 +67,7 @@ func main() {
 	checkError(err)
 
 	var interval com.Request
-
+	fmt.Println("Launching worer at ", worker_dir)
 	for {
 		conn, err := listener.Accept()
 		checkError(err)
