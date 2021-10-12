@@ -130,7 +130,8 @@ func sshWorkerUp(worker string) (string, error) {
 		},
 	}
 	res1 := strings.Split(worker, ":")
-	res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker, res1[0], config)
+	fmt.Println(res1[0])
+	res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go localhost:30003", res1[0], config)
 	return res, err
 }
 
@@ -154,13 +155,14 @@ func main() {
 		checkError(err)
 		fmt.Println(res)
 		go workerControl(ch, workers[i])
-		//fmt.Println("connecting to", workers[i])
+		fmt.Println("connecting to", workers[i])
 	}
 
 	var interval com.Request
 	var hcArgs Params
 
 	for {
+		fmt.Println("Nose")
 		conn, err := listener.Accept()
 		checkError(err)
 
