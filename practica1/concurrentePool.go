@@ -81,7 +81,7 @@ func main() {
 	checkError(err)
 	//Se crea un canal y se lanzan las gorutines
 	ch := make(chan Params)
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 8; i++ {
 		go handleConnexion(ch)
 	}
 
