@@ -51,13 +51,16 @@ func FindPrimes(interval com.TPInterval) (primes []int) {
 
 func main() {
 
-	CONN_TYPE := "tcp"
-	CONN_HOST := "localhost"
-	CONN_PORT := "30000"
+	if len(os.Args) != 2 {
+		fmt.Fprint(os.Stderr, "Usage:go run secuencial_server.go <ip:port> \n")
+		os.Exit(1)
+	}
+	ipPort := os.Args[1]
 
-	listener, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+	listener, err := net.Listen("tcp", ipPort)
 	checkError(err)
 
+	fmt.Println("Listening on:", ipPort)
 	var interval com.Request
 
 	for {

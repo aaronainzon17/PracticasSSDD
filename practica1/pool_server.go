@@ -77,8 +77,17 @@ func handleConnexion(ch chan Params) {
 
 func main() {
 
-	listener, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+	if len(os.Args) != 2 {
+		fmt.Fprint(os.Stderr, "Usage:go run pool_server.go <ip:port> \n")
+		os.Exit(1)
+	}
+	ipPort := os.Args[1]
+
+	listener, err := net.Listen("tcp", ipPort)
 	checkError(err)
+
+	fmt.Println("Listening on:", ipPort)
+
 	//Se crea un canal y se lanzan las gorutines
 	ch := make(chan Params)
 	for i := 0; i < 6; i++ {

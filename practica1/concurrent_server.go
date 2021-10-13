@@ -75,8 +75,16 @@ func handleConnexion(conn net.Conn) {
 
 func main() {
 
-	listener, err := net.Listen(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+	if len(os.Args) != 2 {
+		fmt.Fprint(os.Stderr, "Usage:go run concurrent_server.go <ip:port> \n")
+		os.Exit(1)
+	}
+	ipPort := os.Args[1]
+
+	listener, err := net.Listen("tcp", ipPort)
 	checkError(err)
+
+	fmt.Println("Listening on:", ipPort)
 
 	for {
 		conn, err := listener.Accept()
