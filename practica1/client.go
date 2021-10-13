@@ -101,4 +101,5 @@ func main() {
 		}
 		time.Sleep(time.Duration(tts) * time.Millisecond)
 	}
+	time.Sleep(90000 * time.Millisecond)
 }

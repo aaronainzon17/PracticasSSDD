@@ -67,7 +67,6 @@ func handleConnexion(conn net.Conn) {
 	texec := end.Sub(start)
 	//Se crea un objeto de tipo com.Reply y se envia al cliente
 	solution := com.Reply{reply.Id, primes}
-	fmt.Println(reply.Id)
 	encoder.Encode(solution)
 	fmt.Println("Tiempo de ejecucion: ", texec)
 
