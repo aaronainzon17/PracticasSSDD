@@ -102,22 +102,26 @@ func readFile(path string) []string {
 
 func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 	// open connection
+	fmt.Println("Client: ", client)
 	conn, err := ssh.Dial("tcp", client+":22", s)
 	checkError(err)
 	defer conn.Close()
 
 	// open session
 	session, err := conn.NewSession()
+	fmt.Println("crea Session")
 	checkError(err)
 	defer session.Close()
 
 	// run command and capture stdout/stderr
 	output, err := session.CombinedOutput(cmd)
+	session.Close()
+	conn.Close()
 
 	return fmt.Sprintf("%s", output), err
 }
 
-func sshWorkerUp(worker string) (string, error) {
+func sshWorkerUp(worker string) string {
 	pemBytes, err := ioutil.ReadFile("/home/aaron/.ssh/id_rsa")
 	checkError(err)
 	signer, err := ssh.ParsePrivateKey(pemBytes)
@@ -135,11 +139,14 @@ func sshWorkerUp(worker string) (string, error) {
 	fmt.Println(res1[0])
 	fmt.Println(worker)
 	fmt.Println("Comando:")
-	fmt.Println("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker+" &", res1[0])
-	res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker+" &", res1[0], config)
+	//"cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker+" &"
+	cmd := string("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && ./worker " + worker + " &")
+	fmt.Println(cmd, res1[0])
+	res, err := runCmd(cmd, res1[0], config)
+	checkError(err)
 	fmt.Println("Sale ssh")
 	//res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker+" &", res1[0], config)
-	return res, err
+	return res
 }
 
 func main() {
@@ -161,8 +168,7 @@ func main() {
 	checkError(err)
 
 	for i := range workers {
-		res, err := sshWorkerUp(workers[i])
-		checkError(err)
+		res := sshWorkerUp(workers[i])
 		fmt.Println(res)
 		go workerControl(ch, workers[i])
 		fmt.Println("connecting to", workers[i])
