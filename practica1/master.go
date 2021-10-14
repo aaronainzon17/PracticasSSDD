@@ -105,7 +105,6 @@ func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 
 	// open session
 	session, err := conn.NewSession()
-	fmt.Println("crea Session")
 	checkError(err)
 	defer session.Close()
 
@@ -132,7 +131,7 @@ func sshWorkerUp(worker string, hostUser string, remoteUser string) string {
 		},
 	}
 	res1 := strings.Split(worker, ":")
-	cmd := "ls" //"./worker " + worker + " &"
+	cmd := "./worker " + worker + " &"
 	fmt.Println("Comando:", cmd)
 	res, err := runCmd(cmd, res1[0], config)
 	checkError(err)
