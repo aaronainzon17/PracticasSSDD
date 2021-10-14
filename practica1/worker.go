@@ -60,14 +60,14 @@ func main() {
 		fmt.Fprint(os.Stderr, "Usage go run worker.go ip:port\n")
 		os.Exit(1)
 	}
-	fmt.Println("Entra al worker")
+
 	worker_dir := os.Args[1]
 
 	listener, err := net.Listen("tcp", worker_dir)
 	checkError(err)
 
 	var interval com.Request
-	fmt.Println("Launching worker at ", worker_dir)
+
 	for {
 		conn, err := listener.Accept()
 		checkError(err)
@@ -78,7 +78,6 @@ func main() {
 		err = decoder.Decode(&interval)
 		checkError(err)
 
-		fmt.Println("Se atiende peticion")
 		var respuesta com.Reply
 		respuesta.Primes = FindPrimes(interval.Interval)
 		respuesta.Id = interval.Id
