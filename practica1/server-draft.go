@@ -6,16 +6,14 @@
 * FICHERO: server.go
 * DESCRIPCIÓN: contiene la funcionalidad esencial para realizar los servidores
 *				correspondientes a la práctica 1
-*/
+ */
 package main
 
 import (
-	"encoding/gob"
 	"fmt"
 	"net"
 	"os"
-	"io"
-	"./com"
+	"p1/com"
 )
 
 func checkError(err error) {
@@ -56,6 +54,5 @@ func main() {
 	defer conn.Close()
 	checkError(err)
 
-    // TO DO
+	// TO DO
 }
-
