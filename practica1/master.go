@@ -40,9 +40,7 @@ func checkError(err error) {
 }
 
 func workerControl(ch chan Params, workerIp string) {
-	fmt.Println("Entra a workerControl")
 	for {
-		fmt.Println("Entra al bucle")
 		var reply com.Reply
 		job := <-ch // Recibe un tabajo del canal
 		fmt.Println(job)
@@ -63,14 +61,12 @@ func workerControl(ch chan Params, workerIp string) {
 
 		err = workerEnc.Encode(job.interval)
 		checkError(err)
-		fmt.Println("Llega un trabajo")
 		err = workerDec.Decode(&reply)
 		checkError(err)
 
 		end := time.Now()
 		texec := end.Sub(start)
 
-		fmt.Println("Va a mandar a cliente")
 		err = clientEnc.Encode(reply)
 		checkError(err)
 
@@ -121,14 +117,14 @@ func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 	return fmt.Sprintf("%s", output), err
 }
 
-func sshWorkerUp(worker string) string {
-	pemBytes, err := ioutil.ReadFile("/home/aaron/.ssh/id_rsa")
+func sshWorkerUp(worker string, hostUser string, remoteUser string) string {
+	pemBytes, err := ioutil.ReadFile("/home/" + hostUser + "/.ssh/id_rsa")
 	checkError(err)
 	signer, err := ssh.ParsePrivateKey(pemBytes)
 	checkError(err)
 
 	config := &ssh.ClientConfig{
-		User: "a779088",
+		User: remoteUser,
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			// use OpenSSH's known_hosts file if you care about host validation
@@ -136,28 +132,24 @@ func sshWorkerUp(worker string) string {
 		},
 	}
 	res1 := strings.Split(worker, ":")
-	fmt.Println(res1[0])
-	fmt.Println(worker)
-	fmt.Println("Comando:")
-	//"cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker+" &"
-	cmd := string("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && ./worker " + worker + " &")
-	fmt.Println(cmd, res1[0])
+	cmd := "ls" //"./worker " + worker + " &"
+	fmt.Println("Comando:", cmd)
 	res, err := runCmd(cmd, res1[0], config)
 	checkError(err)
-	fmt.Println("Sale ssh")
-	//res, err := runCmd("cd /home/a779088/cuarto/PracticasSSDD/practica1/ && /usr/local/go/bin/go run worker.go "+worker+" &", res1[0], config)
 	return res
 }
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file>\n")
+	if len(os.Args) < 5 {
+		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file> <hostUser> <remoteUser>\n")
 		os.Exit(1)
 	}
 	//Ip y pueto del worker
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
 	workers := readFile(os.Args[2])
+	hostUser := os.Args[3]
+	remoteUser := os.Args[4]
 
 	//Se crea un canal y se lanzan las gorutines
 	ch := make(chan Params)
@@ -168,28 +160,22 @@ func main() {
 	checkError(err)
 
 	for i := range workers {
-		res := sshWorkerUp(workers[i])
+		res := sshWorkerUp(workers[i], hostUser, remoteUser)
 		fmt.Println(res)
 		go workerControl(ch, workers[i])
 		fmt.Println("connecting to", workers[i])
 	}
 
-	fmt.Println("llega al for")
-
 	for {
 		conn, err := listener.Accept()
 		checkError(err)
-		fmt.Println("Pasa accept")
 
 		decoder := gob.NewDecoder(conn)
-
 		err = decoder.Decode(&interval)
 		checkError(err)
-		fmt.Println("Decodea del cliente")
+
 		hcArgs.conn = conn
 		hcArgs.interval = interval
-		fmt.Println("Mete al canal y se loquea")
 		ch <- hcArgs //anyade el trabajo al canal (pool de Gorutines)
-		fmt.Println("Se desbloquea del canal")
 	}
 }
