@@ -96,7 +96,7 @@ func readFile(path string) []string {
 	return workers
 }
 
-func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
+func runCmd(cmd string, client string, s *ssh.ClientConfig) error {
 	// open connection
 	fmt.Println("Client: ", client)
 	conn, err := ssh.Dial("tcp", client+":22", s)
@@ -109,14 +109,14 @@ func runCmd(cmd string, client string, s *ssh.ClientConfig) (string, error) {
 	defer session.Close()
 
 	// run command and capture stdout/stderr
-	output, err := session.CombinedOutput(cmd)
+	_, err = session.CombinedOutput(cmd)
 	session.Close()
 	conn.Close()
 
-	return fmt.Sprintf("%s", output), err
+	return err
 }
 
-func sshWorkerUp(worker string, hostUser string, remoteUser string) string {
+func sshWorkerUp(worker string, hostUser string, remoteUser string) {
 	pemBytes, err := ioutil.ReadFile("/home/" + hostUser + "/.ssh/id_rsa")
 	checkError(err)
 	signer, err := ssh.ParsePrivateKey(pemBytes)
@@ -133,9 +133,8 @@ func sshWorkerUp(worker string, hostUser string, remoteUser string) string {
 	res1 := strings.Split(worker, ":")
 	cmd := "./worker " + worker + " &"
 	fmt.Println("Comando:", cmd)
-	res, err := runCmd(cmd, res1[0], config)
+	err = runCmd(cmd, res1[0], config)
 	checkError(err)
-	return res
 }
 
 func main() {
@@ -159,8 +158,9 @@ func main() {
 	checkError(err)
 
 	for i := range workers {
-		res := sshWorkerUp(workers[i], hostUser, remoteUser)
-		fmt.Println(res)
+		go sshWorkerUp(workers[i], hostUser, remoteUser)
+		time.Sleep(5000 * time.Millisecond)
+		//fmt.Println(res)
 		go workerControl(ch, workers[i])
 		fmt.Println("connecting to", workers[i])
 	}
