@@ -21,23 +21,25 @@ type Request struct{
 type Reply struct{}
 
 type RASharedDB struct {
-    OurSeqNum   int
-    HigSeqNum   int
-    OutRepCnt   int
-    ReqCS       boolean
+    OurSeqNum   int     // Our sequence number
+    HigSeqNum   int     // Higher sequence number
+    OutRepCnt   int     // Outstanding reply count 
+    ReqCS       boolean // Entiendo que es request critical section 
     RepDefd     int[]
     ms          *MessageSystem
     done        chan bool
     chrep       chan bool
-    Mutex       sync.Mutex // mutex para proteger concurrencia sobre las variables
-    // TODO: completar
+    Mutex       sync.Mutex  // mutex para proteger concurrencia sobre las variables
+    Exclude     bool[2][2]  // [{read,read},{read,write}] [{write,read} {write,write}]
+    N           int         // Numero de nodos en la red
+    Pid         int
 }
 
 
-func New(me int, usersFile string) (*RASharedDB) {
+func New(me int, usersFile string, N int, Pid int) (*RASharedDB) {
     messageTypes := []Message{Request, Reply}
     msgs = ms.New(me, usersFile string, messageTypes)
-    ra := RASharedDB{0, 0, 0, false, []int{}, &msgs,  make(chan bool),  make(chan bool), &sync.Mutex{}}
+    ra := RASharedDB{0, 0, 0, false, []int{}, &msgs,  make(chan bool),  make(chan bool), &sync.Mutex{}, [false,true][false,false], N, Pid}
     // TODO completar
     return &ra
 }
@@ -46,7 +48,17 @@ func New(me int, usersFile string) (*RASharedDB) {
 //Post: Realiza  el  PreProtocol  para el  algoritmo de
 //      Ricart-Agrawala Generalizado
 func (ra *RASharedDB) PreProtocol(){
-    // TODO completar
+    //Traduccion literal del algoritmo en ALGOL
+    ra.Mutex.Lock()
+    ra.ReqCS = true
+    ra.OurSeqNum = ra.HigSeqNum + 1
+    ra.Mutex.Unlock()
+    ra.OutRepCnt = ra.N - 1
+    for i := 1; i <= ra.N; i++ {
+        ra.ms.Send(ra.Pid, "REQUEST")
+    } 
+
+
 }
 
 //Pre: Verdad
