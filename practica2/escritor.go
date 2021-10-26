@@ -16,6 +16,7 @@ import (
 )
 
 var File *ra.RASharedDB
+var PidGestorFIchero int
 
 func checkError(err error) {
 	if err != nil {
@@ -33,6 +34,7 @@ func main() {
 	checkError(err)
 	N, err := strconv.Atoi(os.Args[2])
 	checkError(err)
+	PidGestorFIchero = N + 1
 	path := os.Args[3]
 
 	File = ra.New(me, path, N, 1)
@@ -43,7 +45,7 @@ func main() {
 	for {
 		File.PreProtocol()
 		// SC
-		File.Ms.Send(1, ms.Escribir{Fase: "Escribiendo", OpType: 0, Me: me})
+		File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Escribiendo", OpType: File.OpType, Me: me})
 		//FSC
 		File.PostProtocol()
 		time.Sleep(2000 * time.Millisecond)
