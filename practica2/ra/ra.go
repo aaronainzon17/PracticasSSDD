@@ -9,6 +9,7 @@
 package ra
 
 import (
+	"fmt"
 	"practica2/ms"
 	"sync"
 )
@@ -38,10 +39,13 @@ type RASharedDB struct {
 }
 
 func New(me int, usersFile string, N int, opType int) *RASharedDB {
-	messageTypes := []ms.Message{Request{}, Reply{}}
+	messageTypes := []ms.Message{Request{}, Reply{}, ms.Escribir{}, ms.Leer{}}
 	msgs := ms.New(me, usersFile, messageTypes)
 	ra := RASharedDB{0, 0, 0, false, []bool{}, &msgs, make(chan bool), make(chan bool),
 		sync.Mutex{}, [2][2]bool{{false, true}, {true, true}}, N, me, opType}
+	for i := 0; i < ra.N; i++ {
+		ra.RepDefd = append(ra.RepDefd, false)
+	}
 	return &ra
 }
 
@@ -50,6 +54,7 @@ func New(me int, usersFile string, N int, opType int) *RASharedDB {
 //      Ricart-Agrawala Generalizado
 func (ra *RASharedDB) PreProtocol() {
 	//Traduccion literal del algoritmo en ALGOL
+	fmt.Println("Entra al PREprotocol")
 	ra.Mutex.Lock()
 	ra.ReqCS = true
 	ra.OurSeqNum = ra.HigSeqNum + 1
@@ -57,20 +62,22 @@ func (ra *RASharedDB) PreProtocol() {
 	ra.OutRepCnt = ra.N - 1
 	for j := 1; j <= ra.N; j++ {
 		if j != ra.Me {
-			ra.Ms.Send(j, Request{ra.OurSeqNum, ra.Me, ra.OpType}) //Puede que falten datos para el generalizado como el tipo de op y el reloj interno :))
+			ra.Ms.Send(j, Request{ra.OurSeqNum, ra.Me, ra.OpType})
 		}
 	}
-	for ra.OutRepCnt != 0 { //Duda de si tiene que llegar la reply al channel booleano chrep
+	for ra.OutRepCnt != 0 {
+		fmt.Println("Esperando respuestas de todos")
 		<-ra.Chrep // Se recibe respuesta por el canal de respuestas (no es necesario almacenar el valor de la respuesta en ninguna variable)
 		ra.OutRepCnt--
 	}
-	// Despues del preprotocol se pasa a la seccion critica
+	fmt.Println("Todas las respuestas recibidas")
 }
 
 //Pre: Verdad
 //Post: Realiza  el  PostProtocol  para el  algoritmo de
 //      Ricart-Agrawala Generalizado
 func (ra *RASharedDB) PostProtocol() {
+	fmt.Println("Entra al POSTprotocol")
 	ra.ReqCS = false
 	for j := 1; j <= ra.N; j++ {
 		if ra.RepDefd[j-1] {
@@ -82,7 +89,7 @@ func (ra *RASharedDB) PostProtocol() {
 
 func (ra *RASharedDB) Stop() {
 	ra.Ms.Stop()
-	ra.Done <- true
+	ra.Done <- true // Despues del preprotocol se pasa a la seccion critica
 }
 
 func max(x, y int) int {
@@ -101,10 +108,11 @@ func (ra *RASharedDB) RecieveReqRes() {
 		msg := ra.Ms.Receive()
 		req, ok := msg.(Request)
 		if ok {
+			fmt.Println("Se ha recibido peticion REQUEST")
 			ra.HigSeqNum = max(ra.HigSeqNum, req.Clock)
 			ra.Mutex.Lock()
 			defer_it = ra.ReqCS &&
-				((req.Clock > ra.HigSeqNum) || (req.Clock == ra.OurSeqNum && req.Pid > ra.Me)) &&
+				((req.Clock > ra.OurSeqNum) || (req.Clock == ra.OurSeqNum && req.Pid > ra.Me)) &&
 				ra.Exclude[ra.OpType][req.OpType] // Echarle un ojo al general
 			ra.Mutex.Unlock()
 			if defer_it {
@@ -113,6 +121,7 @@ func (ra *RASharedDB) RecieveReqRes() {
 				ra.Ms.Send(req.Pid, Reply{})
 			}
 		} else {
+			fmt.Println("Se ha recibido peticion REPLY")
 			ra.Chrep <- true
 		}
 	}

@@ -45,6 +45,7 @@ func main() {
 	for {
 		File.PreProtocol()
 		// SC
+		fmt.Println("Leyendo...")
 		File.Ms.Send(PidGestorFIchero, ms.Leer{Fase: "Leyendo", OpType: File.OpType, Me: me})
 		//FSC
 		File.PostProtocol()
