@@ -9,7 +9,6 @@
 package ra
 
 import (
-	"fmt"
 	"practica2/ms"
 	"sync"
 )
@@ -54,7 +53,7 @@ func New(me int, usersFile string, N int, opType int) *RASharedDB {
 //      Ricart-Agrawala Generalizado
 func (ra *RASharedDB) PreProtocol() {
 	//Traduccion literal del algoritmo en ALGOL
-	fmt.Println("Entra al PREprotocol")
+	//fmt.Println("Entra al PREprotocol")
 	ra.Mutex.Lock()
 	ra.ReqCS = true
 	ra.OurSeqNum = ra.HigSeqNum + 1
@@ -66,18 +65,18 @@ func (ra *RASharedDB) PreProtocol() {
 		}
 	}
 	for ra.OutRepCnt != 0 {
-		fmt.Println("Esperando respuestas de todos")
+		//fmt.Println("Esperando respuestas de todos")
 		<-ra.Chrep // Se recibe respuesta por el canal de respuestas (no es necesario almacenar el valor de la respuesta en ninguna variable)
 		ra.OutRepCnt--
 	}
-	fmt.Println("Todas las respuestas recibidas")
+	//fmt.Println("Todas las respuestas recibidas")
 }
 
 //Pre: Verdad
 //Post: Realiza  el  PostProtocol  para el  algoritmo de
 //      Ricart-Agrawala Generalizado
 func (ra *RASharedDB) PostProtocol() {
-	fmt.Println("Entra al POSTprotocol")
+	//fmt.Println("Entra al POSTprotocol")
 	ra.ReqCS = false
 	for j := 1; j <= ra.N; j++ {
 		if ra.RepDefd[j-1] {
@@ -108,7 +107,7 @@ func (ra *RASharedDB) RecieveReqRes() {
 		msg := ra.Ms.Receive()
 		req, ok := msg.(Request)
 		if ok {
-			fmt.Println("Se ha recibido peticion REQUEST")
+			//fmt.Println("Se ha recibido peticion REQUEST")
 			ra.HigSeqNum = max(ra.HigSeqNum, req.Clock)
 			ra.Mutex.Lock()
 			defer_it = ra.ReqCS &&
@@ -121,7 +120,7 @@ func (ra *RASharedDB) RecieveReqRes() {
 				ra.Ms.Send(req.Pid, Reply{})
 			}
 		} else {
-			fmt.Println("Se ha recibido peticion REPLY")
+			//fmt.Println("Se ha recibido peticion REPLY")
 			ra.Chrep <- true
 		}
 	}

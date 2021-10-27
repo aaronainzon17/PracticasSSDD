@@ -8,6 +8,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"practica2/ms"
 	"practica2/ra"
@@ -15,8 +16,8 @@ import (
 	"time"
 )
 
-var File *ra.RASharedDB
-var PidGestorFIchero int
+//var File *ra.RASharedDB
+//var PidGestorFIchero int
 
 func checkError(err error) {
 	if err != nil {
@@ -34,21 +35,28 @@ func main() {
 	checkError(err)
 	N, err := strconv.Atoi(os.Args[2])
 	checkError(err)
-	PidGestorFIchero = N + 1
+	PidGestorFIchero := N + 1
 	path := os.Args[3]
 
-	File = ra.New(me, path, N, 1)
+	File := ra.New(me, path, N, 1)
 	go File.RecieveReqRes()
 
-	time.Sleep(1 * time.Second) //Para dar tiempo a lanzar el resto
+	time.Sleep(5 * time.Second) //Para dar tiempo a lanzar el resto
 
 	for {
 		File.PreProtocol()
 		// SC
 		fmt.Println("Escribiendo...")
-		File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Escribiendo", OpType: File.OpType, Me: me})
+		File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Comienzo de escritura", OpType: File.OpType, Me: me})
+		rand.Seed(time.Now().UnixNano())
+		a := rand.Intn(7)
+		for i := 0; i < a; i++ {
+			fmt.Println("Escribo", a, "lineas")
+			File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Escribiendo...", OpType: File.OpType, Me: me})
+		}
+		File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Fin de escritura", OpType: File.OpType, Me: me})
 		//FSC
 		File.PostProtocol()
-		time.Sleep(2000 * time.Millisecond)
+		time.Sleep(time.Duration(a) * time.Second)
 	}
 }

@@ -41,14 +41,14 @@ func main() {
 		fmt.Println("isWr:", isWr, ",isRd:", isRd)
 		if isWr { // The process wants to write
 			fmt.Println("Recibo peticion de lectura de", escritor.Me)
-			_, err := f.WriteString("Operation from " + strconv.Itoa(escritor.Me) + ": " + escritor.Fase + "\n")
+			_, err := f.WriteString("PROCESO: " + strconv.Itoa(escritor.Me) + ": " + escritor.Fase + "\n")
 			checkError(err)
 		} else if isRd { //The process wants to read
 			fmt.Println("Recibo peticion de escritura de", lector.Me)
-			_, err := f.WriteString("Operation from " + strconv.Itoa(lector.Me) + ": " + lector.Fase + "\n")
+			_, err := f.WriteString("PROCESO: " + strconv.Itoa(lector.Me) + ": " + lector.Fase + "\n")
 			checkError(err)
 		} else {
-			fmt.Println("Recibo peticion desconocida de ", escritor.Me, lector.Me)
+			fmt.Println("PETICION DESCONOCIDAD DE: ", escritor.Me, lector.Me)
 			_, err := f.WriteString("Unknown Operation\n")
 			checkError(err)
 		}
