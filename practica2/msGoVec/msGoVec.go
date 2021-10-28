@@ -6,7 +6,7 @@
 * FICHERO: ms.go
 * DESCRIPCIÓN: Implementación de un sistema de mensajería asíncrono, insipirado en el Modelo Actor
  */
-package ms
+package msGoVec
 
 import (
 	"bufio"
@@ -66,8 +66,8 @@ func parsePeers(path string) (lines []string) {
 
 // Pre: pid en {1..n}, el conjunto de procesos del SD
 // Post: envía el mensaje msg a pid
-func (ms *MessageSystem) Send(pid int, msg Message) {
-	conn, err := net.Dial("tcp", ms.peers[pid-1])
+func (msGoVec *MessageSystem) Send(pid int, msg Message) {
+	conn, err := net.Dial("tcp", msGoVec.peers[pid-1])
 	checkError(err)
 	encoder := gob.NewEncoder(conn)
 	err = encoder.Encode(&msg)
@@ -77,8 +77,8 @@ func (ms *MessageSystem) Send(pid int, msg Message) {
 // Pre: True
 // Post: el mensaje msg de algún Proceso P_j se retira del mailbox y se devuelve
 //		Si mailbox vacío, Receive bloquea hasta que llegue algún mensaje
-func (ms *MessageSystem) Receive() (msg Message) {
-	msg = <-ms.mbox
+func (msGoVec *MessageSystem) Receive() (msg Message) {
+	msg = <-msGoVec.mbox
 	return msg
 }
 
@@ -91,20 +91,20 @@ func register(messageTypes []Message) {
 // Pre: whoIam es el pid del proceso que inicializa este ms
 //		usersFile es la ruta a un fichero de texto que en cada línea contiene IP:puerto de cada participante
 //		messageTypes es un slice con todos los tipos de mensajes que los procesos se pueden intercambiar a través de este ms
-func New(whoIam int, usersFile string, messageTypes []Message) (ms MessageSystem) {
-	ms.me = whoIam
-	ms.peers = parsePeers(usersFile)
-	ms.mbox = make(chan Message, MAXMESSAGES)
-	ms.done = make(chan bool)
+func New(whoIam int, usersFile string, messageTypes []Message) (msGoVec MessageSystem) {
+	msGoVec.me = whoIam
+	msGoVec.peers = parsePeers(usersFile)
+	msGoVec.mbox = make(chan Message, MAXMESSAGES)
+	msGoVec.done = make(chan bool)
 	register(messageTypes)
 	go func() {
-		listener, err := net.Listen("tcp", ms.peers[ms.me-1])
+		listener, err := net.Listen("tcp", msGoVec.peers[msGoVec.me-1])
 		checkError(err)
-		fmt.Println("Process listening at " + ms.peers[ms.me-1])
-		defer close(ms.mbox)
+		fmt.Println("Process listening at " + msGoVec.peers[msGoVec.me-1])
+		defer close(msGoVec.mbox)
 		for {
 			select {
-			case <-ms.done:
+			case <-msGoVec.done:
 				return
 			default:
 				conn, err := listener.Accept()
@@ -113,11 +113,11 @@ func New(whoIam int, usersFile string, messageTypes []Message) (ms MessageSystem
 				var msg Message
 				err = decoder.Decode(&msg)
 				conn.Close()
-				ms.mbox <- msg
+				msGoVec.mbox <- msg
 			}
 		}
 	}()
-	return ms
+	return msGoVec
 }
 
 //Pre: True
