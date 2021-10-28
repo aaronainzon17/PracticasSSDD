@@ -1,0 +1,72 @@
+Lector1 {"Lector1":1}
+Initialization Complete
+Lector1 {"Lector1":2, "Escritor3":2}
+INFO Received Message 
+Lector1 {"Lector1":3, "Escritor3":2}
+INFO Reply request
+Lector1 {"Lector1":4, "Escritor3":3, "Lector2":3}
+INFO Received Message 
+Lector1 {"Lector2":3, "Lector1":5, "Escritor3":3}
+INFO Sending message REQ
+Lector1 {"Lector1":6, "Escritor3":3, "Lector2":3}
+INFO Reply request
+Lector1 {"Lector2":3, "Lector1":7, "Escritor3":3}
+INFO Sending message REQ
+Lector1 {"Lector1":8, "Escritor3":3, "Lector2":6}
+INFO Received Message 
+Lector1 {"Lector1":9, "Escritor3":6, "Lector2":11}
+INFO Received Message 
+Lector1 {"Lector1":10, "Escritor3":6, "Lector2":11}
+INFO Reply request
+Lector1 {"Lector1":11, "Escritor3":10, "Lector2":11}
+INFO Received Message 
+Lector1 {"Escritor3":10, "Lector2":11, "Lector1":12}
+INFO SC
+Lector1 {"Lector2":16, "Lector1":13, "Escritor3":12}
+INFO Received Message 
+Lector1 {"Lector1":14, "Escritor3":12, "Lector2":16}
+INFO Reply request
+Lector1 {"Lector1":15, "Escritor3":15, "Lector2":17}
+INFO Received Message 
+Lector1 {"Escritor3":15, "Lector2":17, "Lector1":16}
+INFO Reply request
+Lector1 {"Lector1":17, "Escritor3":16, "Lector2":23}
+INFO Received Message 
+Lector1 {"Lector1":18, "Escritor3":16, "Lector2":23}
+INFO Reply request
+Lector1 {"Lector1":19, "Escritor3":22, "Lector2":24}
+INFO Received Message 
+Lector1 {"Lector1":20, "Escritor3":22, "Lector2":24}
+INFO Reply request
+Lector1 {"Escritor3":22, "Lector2":24, "Lector1":21}
+INFO Sending message REQ
+Lector1 {"Lector1":22, "Escritor3":22, "Lector2":24}
+INFO Sending message REQ
+Lector1 {"Lector2":31, "Lector1":23, "Escritor3":23}
+INFO Received Message 
+Lector1 {"Lector1":24, "Escritor3":28, "Lector2":31}
+INFO Received Message 
+Lector1 {"Lector2":31, "Lector1":25, "Escritor3":28}
+INFO SC
+Lector1 {"Lector1":26, "Escritor3":29, "Lector2":31}
+INFO Received Message 
+Lector1 {"Lector1":27, "Escritor3":29, "Lector2":31}
+INFO Reply request
+Lector1 {"Lector1":28, "Escritor3":34, "Lector2":33}
+INFO Received Message 
+Lector1 {"Lector1":29, "Escritor3":34, "Lector2":33}
+INFO Reply request
+Lector1 {"Lector1":30, "Escritor3":34, "Lector2":33}
+INFO Sending message REQ
+Lector1 {"Lector1":31, "Escritor3":34, "Lector2":33}
+INFO Sending message REQ
+Lector1 {"Lector1":32, "Escritor3":35, "Lector2":37}
+INFO Received Message 
+Lector1 {"Lector1":33, "Escritor3":40, "Lector2":37}
+INFO Received Message 
+Lector1 {"Lector1":34, "Escritor3":40, "Lector2":37}
+INFO SC
+Lector1 {"Lector1":35, "Escritor3":40, "Lector2":38}
+INFO Received Message 
+Lector1 {"Lector1":36, "Escritor3":40, "Lector2":38}
+INFO Reply request
