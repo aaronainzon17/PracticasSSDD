@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ $# -ne 1 ] || [ $1 != "go" ] || [ $1 = "govec" ]; then
+if [ $# -ne 1 ] || [ $1 != "go" ] || [ $1 != "govec" ]; then
   echo "Usage: ./startRW.sh <govec/go>"
   exit 1
 fi
