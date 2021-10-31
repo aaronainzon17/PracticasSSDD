@@ -1,33 +1,33 @@
 #!/bin/bash
 
-kill_list="$( ps -eo pid,comm | sed -e 's/ \+//' | tr -s " " | grep 'lector' | cut -d' ' -f1)"
+PROC="$( pgrep 'lector' )"
 
-for i in $kill_list
+for i in $PROC
 do
         kill -9 ${i} > /dev/null 2>&1
 done
 
-kill_list="$( ps -eo pid,comm | sed -e 's/ \+//' | tr -s " " | grep 'escritor' | cut -d' ' -f1)"
+PROC="$( pgrep 'escritor' )"
 
-for i in $kill_list
+for i in $PROC
 do
         kill -9 ${i} > /dev/null 2>&1
 done
 
-kill_list="$( ps -eo pid,comm | sed -e 's/ \+//' | tr -s " " | grep 'gestorfichero$' | cut -d' ' -f1)"
+PROC="$( pgrep 'gestorfichero' )"
 
-for i in $kill_list
+for i in $PROC
 do
         kill -9 ${i} > /dev/null 2>&1
 done
 
-kill_list="$( ps -eo pid,comm | sed -e 's/ \+//' | tr -s " " | grep 'ra$' | cut -d' ' -f1)"
+PROC="$( pgrep 'ra' )"
 
-for i in $kill_list
+for i in $PROC
 do
         kill -9 ${i} > /dev/null 2>&1
 done
 
-echo "SSDD Stopped"
+echo "Lectores y Escritores detenido "
 
 exit 0
