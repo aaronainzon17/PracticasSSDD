@@ -39,7 +39,7 @@ func main() {
 	path := os.Args[3]
 
 	File := ra.New(me, path, N, 0)
-	go File.RecieveReqRes()
+	go File.GestionReqRes()
 
 	time.Sleep(5 * time.Second) //Para dar tiempo a lanzar el resto
 

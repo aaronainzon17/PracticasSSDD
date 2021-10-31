@@ -44,7 +44,7 @@ func main() {
 	logger := govec.InitGoVector("Lector"+os.Args[1], "LogFile"+os.Args[1], govec.GetDefaultConfig())
 
 	File := raGoVec.New(me, path, N, 0, logger)
-	go File.RecieveReqRes()
+	go File.GestionReqRes()
 
 	time.Sleep(5 * time.Second) //Para dar tiempo a lanzar el resto
 

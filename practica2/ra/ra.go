@@ -100,7 +100,7 @@ func max(x, y int) int {
 }
 
 //Process wich recieves request,response
-func (ra *RASharedDB) RecieveReqRes() {
+func (ra *RASharedDB) GestionReqRes() {
 	defer_it := false
 	for {
 		//Se recibe la peticion
