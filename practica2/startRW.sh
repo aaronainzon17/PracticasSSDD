@@ -1,11 +1,13 @@
 #!/bin/sh
 
-if [ $# -ne 1 ] || [ $1 != "go" ] || [ $1 != "govec" ]; then
+if [ $# -ne 1 ]; then
   echo "Usage: ./startRW.sh <govec/go>"
   exit 1
 fi
 
-go run gestorfichero.go 4 ./ms/users.txt &
+if [ $1 != "go" ] || [ $1 != "govec" ];then 
+  go run gestorfichero.go 4 ./ms/users.txt &
+fi
 
 if [ $1 = "govec" ]; then 
   go run lectorGoVec.go 1 3 ./ms/users.txt &
