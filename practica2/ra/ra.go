@@ -40,8 +40,13 @@ type RASharedDB struct {
 func New(me int, usersFile string, N int, opType int) *RASharedDB {
 	messageTypes := []ms.Message{Request{}, Reply{}, ms.Escribir{}, ms.Leer{}}
 	msgs := ms.New(me, usersFile, messageTypes)
+	var ExcludeAux [2][2]bool
+	ExcludeAux[0][0] = false
+	ExcludeAux[0][1] = true
+	ExcludeAux[1][0] = true
+	ExcludeAux[1][1] = true
 	ra := RASharedDB{0, 0, 0, false, []bool{}, &msgs, make(chan bool), make(chan bool),
-		sync.Mutex{}, [2][2]bool{{false, true}, {true, true}}, N, me, opType}
+		sync.Mutex{}, ExcludeAux, N, me, opType}
 	for i := 0; i < ra.N; i++ {
 		ra.RepDefd = append(ra.RepDefd, false)
 	}
@@ -52,8 +57,7 @@ func New(me int, usersFile string, N int, opType int) *RASharedDB {
 //Post: Realiza  el  PreProtocol  para el  algoritmo de
 //      Ricart-Agrawala Generalizado
 func (ra *RASharedDB) PreProtocol() {
-	//Traduccion literal del algoritmo en ALGOL
-	//fmt.Println("Entra al PREprotocol")
+	//Traduccion del algoritmo en ALGOL
 	ra.Mutex.Lock()
 	ra.ReqCS = true
 	ra.OurSeqNum = ra.HigSeqNum + 1
@@ -65,23 +69,20 @@ func (ra *RASharedDB) PreProtocol() {
 		}
 	}
 	for ra.OutRepCnt != 0 {
-		//fmt.Println("Esperando respuestas de todos")
 		<-ra.Chrep // Se recibe respuesta por el canal de respuestas (no es necesario almacenar el valor de la respuesta en ninguna variable)
 		ra.OutRepCnt--
 	}
-	//fmt.Println("Todas las respuestas recibidas")
 }
 
 //Pre: Verdad
 //Post: Realiza  el  PostProtocol  para el  algoritmo de
 //      Ricart-Agrawala Generalizado
 func (ra *RASharedDB) PostProtocol() {
-	//fmt.Println("Entra al POSTprotocol")
 	ra.ReqCS = false
 	for j := 1; j <= ra.N; j++ {
 		if ra.RepDefd[j-1] {
 			ra.RepDefd[j-1] = false
-			ra.Ms.Send(j, Reply{}) // Falta bullshit to send
+			ra.Ms.Send(j, Reply{})
 		}
 	}
 }
@@ -99,15 +100,13 @@ func max(x, y int) int {
 	}
 }
 
-//Process wich recieves request,response
+//En esta funcion se gestionan los mensajes de request y reply
 func (ra *RASharedDB) GestionReqRes() {
 	defer_it := false
 	for {
 		//Se recibe la peticion
 		msg := ra.Ms.Receive()
-		req, ok := msg.(Request)
-		if ok {
-			//fmt.Println("Se ha recibido peticion REQUEST")
+		if req, ok := msg.(Request); ok {
 			ra.HigSeqNum = max(ra.HigSeqNum, req.Clock)
 			ra.Mutex.Lock()
 			defer_it = ra.ReqCS &&
@@ -120,7 +119,6 @@ func (ra *RASharedDB) GestionReqRes() {
 				ra.Ms.Send(req.Pid, Reply{})
 			}
 		} else {
-			//fmt.Println("Se ha recibido peticion REPLY")
 			ra.Chrep <- true
 		}
 	}
