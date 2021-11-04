@@ -18,9 +18,6 @@ import (
 	"github.com/DistributedClocks/GoVector/govec"
 )
 
-//var File *ra.RASharedDB
-//var PidGestorFIchero int
-
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
@@ -50,19 +47,19 @@ func main() {
 
 	for {
 		File.PreProtocol()
+
 		// SC
 		File.Log.LogLocalEvent("SC", govec.GetDefaultLogOptions())
-		//fmt.Println("Escribiendo...")
 		File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Comienzo de escritura", OpType: File.OpType, Me: me})
 
 		rand.Seed(time.Now().UnixNano())
 		a := rand.Intn(7)
 		for i := 0; i < a; i++ {
-			//fmt.Println("Escribo", a, "lineas")
 			File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Escribiendo...", OpType: File.OpType, Me: me})
 		}
 		File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Fin de escritura", OpType: File.OpType, Me: me})
 		//FSC
+
 		File.PostProtocol()
 		time.Sleep(time.Duration(a) * time.Second)
 	}

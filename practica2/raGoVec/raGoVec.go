@@ -31,10 +31,11 @@ type RASharedDB struct {
 	ReqCS     bool // Request critical section
 	RepDefd   []bool
 	Ms        *ms.MessageSystem
+	MsLog     *ms.MessageSystem
 	Done      chan bool
 	Chrep     chan bool
 	Mutex     sync.Mutex // mutex para proteger concurrencia sobre las variables
-	Exclude   [2][2]bool // [{read,read},{read,write}]
+	Exclude   [2][2]bool // [{read,read},{read,write}] [{write,read} {write,write}]
 	N         int        // Numero de nodos en la red
 	Me        int        // Identificador del proceso
 	OpType    int        // 0 -> read, 1 -> write
@@ -42,14 +43,16 @@ type RASharedDB struct {
 }
 
 func New(me int, usersFile string, N int, opType int, Logger *govec.GoLog) *RASharedDB {
-	messageTypes := []ms.Message{Request{}, Reply{}, ms.Escribir{}, ms.Leer{}, ms.GoVecMsg{}}
+	messageTypes := []ms.Message{Request{}, Reply{}, ms.Escribir{}, ms.Leer{}}
 	msgs := ms.New(me, usersFile, messageTypes)
+	messageTypesLog := []ms.Message{ms.GoVecMsg{}}
+	msgsLog := ms.New(me, "./ms/usersLog.txt", messageTypesLog)
 	var ExcludeAux [2][2]bool
 	ExcludeAux[0][0] = false
 	ExcludeAux[0][1] = true
 	ExcludeAux[1][0] = true
 	ExcludeAux[1][1] = true
-	ra := RASharedDB{0, 0, 0, false, []bool{}, &msgs, make(chan bool), make(chan bool),
+	ra := RASharedDB{0, 0, 0, false, []bool{}, &msgs, &msgsLog, make(chan bool), make(chan bool),
 		sync.Mutex{}, ExcludeAux, N, me, opType, Logger}
 	for i := 0; i < ra.N; i++ {
 		ra.RepDefd = append(ra.RepDefd, false)
@@ -69,10 +72,10 @@ func (ra *RASharedDB) PreProtocol() {
 	ra.OutRepCnt = ra.N - 1
 	for j := 1; j <= ra.N; j++ {
 		if j != ra.Me {
+			ra.Ms.Send(j, Request{ra.OurSeqNum, ra.Me, ra.OpType})
 			msgBytes := []byte("Request")
 			logMsg := ra.Log.PrepareSend("Sending message REQ", msgBytes, govec.GetDefaultLogOptions())
-			ra.Ms.Send(j, ms.GoVecMsg{Msg: logMsg})
-			ra.Ms.Send(j, Request{ra.OurSeqNum, ra.Me, ra.OpType})
+			ra.MsLog.Send(j, ms.GoVecMsg{Msg: logMsg})
 		}
 	}
 	for ra.OutRepCnt != 0 {
@@ -89,10 +92,10 @@ func (ra *RASharedDB) PostProtocol() {
 	for j := 1; j <= ra.N; j++ {
 		if ra.RepDefd[j-1] {
 			ra.RepDefd[j-1] = false
+			ra.Ms.Send(j, Reply{})
 			msgBytes := []byte("Reply")
 			logMsg := ra.Log.PrepareSend("Sending message REP", msgBytes, govec.GetDefaultLogOptions())
-			ra.Ms.Send(j, ms.GoVecMsg{Msg: logMsg})
-			ra.Ms.Send(j, Reply{})
+			ra.MsLog.Send(j, ms.GoVecMsg{Msg: logMsg})
 		}
 	}
 }
@@ -114,8 +117,15 @@ func max(x, y int) int {
 func (ra *RASharedDB) GestionReqRes() {
 	defer_it := false
 	for {
-		//Se recibe la peticion
+		//Se recibe la peticion por el canal de mensajes
 		msg := ra.Ms.Receive()
+
+		//Se recibe por el canal de Log
+		msgLog := ra.MsLog.Receive()
+		//Se comprueba y procesa un mensaje de tipo GOVECMSG
+		if reqLog, okLog := msgLog.(ms.GoVecMsg); okLog {
+			ra.Log.UnpackReceive("Received Message ", reqLog.Msg, nil, govec.GetDefaultLogOptions())
+		}
 		//Se comprueba y procesa un mensaje de tipo REQUEST
 		if req, ok := msg.(Request); ok {
 			ra.HigSeqNum = max(ra.HigSeqNum, req.Clock)
@@ -128,17 +138,14 @@ func (ra *RASharedDB) GestionReqRes() {
 				fmt.Println("DEFER IT")
 				ra.RepDefd[req.Pid-1] = true
 			} else {
+				ra.Ms.Send(req.Pid, Reply{})
 				msgBytes := []byte("Reply")
 				logMsg := ra.Log.PrepareSend("Reply request", msgBytes, govec.GetDefaultLogOptions())
-				ra.Ms.Send(req.Pid, ms.GoVecMsg{Msg: logMsg})
-				ra.Ms.Send(req.Pid, Reply{})
+				ra.MsLog.Send(req.Pid, ms.GoVecMsg{Msg: logMsg})
 			}
 			//Se comprueba y procesa un mensaje de tipo REPLY
-		} else if _, ok := msg.(Reply); ok {
+		} else {
 			ra.Chrep <- true
-			//Se comprueba y procesa un mensaje de tipo GOVECMSG
-		} else if reqLog, ok := msg.(ms.GoVecMsg); ok {
-			ra.Log.UnpackReceive("Received Message ", reqLog.Msg, nil, govec.GetDefaultLogOptions())
 		}
 	}
 }

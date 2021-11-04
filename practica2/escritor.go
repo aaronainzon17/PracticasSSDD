@@ -16,9 +16,6 @@ import (
 	"time"
 )
 
-//var File *ra.RASharedDB
-//var PidGestorFIchero int
-
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
@@ -45,6 +42,7 @@ func main() {
 
 	for {
 		File.PreProtocol()
+
 		// SC
 		fmt.Println("Escribiendo...")
 		File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Comienzo de escritura", OpType: File.OpType, Me: me})
@@ -56,6 +54,7 @@ func main() {
 		}
 		File.Ms.Send(PidGestorFIchero, ms.Escribir{Fase: "Fin de escritura", OpType: File.OpType, Me: me})
 		//FSC
+
 		File.PostProtocol()
 		time.Sleep(time.Duration(a) * time.Second)
 	}
