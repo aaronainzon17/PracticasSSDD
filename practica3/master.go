@@ -13,11 +13,11 @@ package main
 
 import (
 	"bufio"
-	"encoding/gob"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
+	"net/rpc"
 	"os"
 	"practica3/com"
 	"strings"
@@ -26,11 +26,18 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-//Objeto con el intervalo de primos y la conexion
-type Params struct {
-	interval com.Request
-	conn     net.Conn
+type Reply struct {
+	primes []int
+	err    error
 }
+
+type Params struct {
+	Op2ex     string
+	Interval  com.TPInterval
+	ReplyChan chan Reply
+}
+
+var loadChan = make(chan Params, 100) //canal para los trabajos
 
 func checkError(err error) {
 	if err != nil {
@@ -39,41 +46,26 @@ func checkError(err error) {
 	}
 }
 
-func workerControl(ch chan Params, workerIp string) {
-	for {
-		var reply com.Reply
-		job := <-ch // Recibe un tabajo del canal
-		fmt.Println(job)
-		clientConn := job.conn // Conexion al cliente
+func workerControl(workerIp string) {
 
-		start := time.Now() // Se inicia el contador de tiempo
+	for {
+		job := <-loadChan // Recibe un tabajo del canal
+		fmt.Println(job)
 
 		// Se establece una conexion TCP con el worker
-		tcpAddr, err := net.ResolveTCPAddr("tcp", workerIp)
-		checkError(err)
-		workerConn, err := net.DialTCP("tcp", nil, tcpAddr)
-		defer workerConn.Close()
+		workerCon, err := rpc.DialHTTP("tcp", workerIp)
 		checkError(err)
 
-		workerEnc := gob.NewEncoder(workerConn)
-		workerDec := gob.NewDecoder(workerConn)
-		clientEnc := gob.NewEncoder(clientConn)
-
-		err = workerEnc.Encode(job.interval)
-		checkError(err)
-		err = workerDec.Decode(&reply)
-		checkError(err)
-
-		end := time.Now()
-		texec := end.Sub(start)
-
-		err = clientEnc.Encode(reply)
-		checkError(err)
-
-		fmt.Println("Tiempo de ejecucion: \n", texec)
-
-		// close connection on exit
-		clientConn.Close()
+		// Asynchronous call
+		var reply []int
+		divCall := workerCon.Go(job.Op2ex, job.Interval, &reply, nil)
+		select {
+		//Caso en el que el worker acaba correctamente
+		case rep := <-divCall.Done:
+			if rep.Error == nil { //Si no hay error se guarda la respuesta en el tipo Reply
+				job.ReplyChan <- Reply{primes: reply, err: rep.Error}
+			}
+		}
 	}
 }
 
@@ -131,7 +123,7 @@ func sshWorkerUp(worker string, hostUser string, remoteUser string) {
 		},
 	}
 	res1 := strings.Split(worker, ":")
-	cmd := "./worker " + worker + " &"
+	cmd := "cd /home/a779088/cuarto/PracticasSSDD/practica3 && ./worker " + worker + " &"
 	fmt.Println("Comando:", cmd)
 	err = runCmd(cmd, res1[0], config)
 	checkError(err)
@@ -149,32 +141,19 @@ func main() {
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
-	//Se crea un canal y se lanzan las gorutines
-	ch := make(chan Params)
-	var interval com.Request
-	var hcArgs Params
-
-	listener, err := net.Listen("tcp", ipPort)
+	l, err := net.Listen("tcp", ipPort)
 	checkError(err)
 
 	for i := range workers {
 		go sshWorkerUp(workers[i], hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
 		//fmt.Println(res)
-		go workerControl(ch, workers[i])
+		go workerControl(workers[i])
 		fmt.Println("connecting to", workers[i])
 	}
 
 	for {
-		conn, err := listener.Accept()
-		checkError(err)
-
-		decoder := gob.NewDecoder(conn)
-		err = decoder.Decode(&interval)
-		checkError(err)
-
-		hcArgs.conn = conn
-		hcArgs.interval = interval
-		ch <- hcArgs //anyade el trabajo al canal (pool de Gorutines)
+		rpc.Register(loadChan)
+		rpc.Accept(l)
 	}
 }
