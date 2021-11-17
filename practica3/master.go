@@ -17,6 +17,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"net/rpc"
 	"os"
 	"practica3/com"
@@ -26,9 +27,9 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type Master struct {
+/*type Master struct {
 	//mutex sync.Mutex
-}
+}*/
 
 type Reply struct {
 	primes []int
@@ -66,7 +67,7 @@ func (p *Master) FindPrimes(interval com.TPInterval, primeList *[]int) error {
 	return nil
 }
 
-func (P *Master) workerControl(workerIp string) {
+func workerControl(workerIp string) {
 
 	for {
 		job := <-requestChan // Recibe un tabajo del canal
@@ -161,27 +162,20 @@ func main() {
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
-	master := new(Master)
-
-	l, err := net.Listen("tcp", ipPort)
-	checkError(err)
-	s := rpc.NewServer()
 	for i := range workers {
 		go sshWorkerUp(workers[i], hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
 		//fmt.Println(res)
-		go master.workerControl(workers[i])
+		go workerControl(workers[i])
 		fmt.Println("connecting to", workers[i])
 	}
 	fmt.Println("SERVING ...")
 
-	for {
-		s.Accept(l)
-		rpc.Register(master)
-		fmt.Println("Registro una peticion")
-	}
-
-	//rpc.HandleHTTP()
-	//http.Serve(l, nil)
+	primesImpl := new(PrimesImpl)
+	rpc.Register(primesImpl)
+	rpc.HandleHTTP()
+	l, err := net.Listen("tcp", ipPort)
+	checkError(err)
+	http.Serve(l, nil)
 
 }
