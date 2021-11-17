@@ -22,6 +22,7 @@ import (
 	"os"
 	"practica3/com"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -166,6 +167,13 @@ func main() {
 	l, err := net.Listen("tcp", ipPort)
 	checkError(err)
 
+	for i := range workers {
+		go sshWorkerUp(workers[i], hostUser, remoteUser)
+		time.Sleep(5000 * time.Millisecond)
+		//fmt.Println(res)
+		go master.workerControl(workers[i])
+		fmt.Println("connecting to", workers[i])
+	}
 	fmt.Println("SERVING ...")
 
 	//rpc.Accept(l)
