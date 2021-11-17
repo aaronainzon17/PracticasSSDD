@@ -162,16 +162,16 @@ func workerControl(workerIp string) {
 						job.ReplyChan <- Reply{primes: reply, err: rep.Error}
 					} else {
 						//Se guarda fallo
-						job.ReplyChan <- Reply{reply, fmt.Errorf("Worker crashed")}
 						CRASHED++
-						//fmt.Println("Goroutine exiting on worker ")
+						job.ReplyChan <- Reply{reply, fmt.Errorf("Worker crashed")}
 						//Se envia la direccion del worker caido por el canal para intentar levantarlo
 						IPWORKERS <- workerIp
 						fin = true
 					}
 				case <-time.After(3 * time.Second):
-					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
 					DELAYED++
+					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
+
 				}
 			} else {
 				fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
