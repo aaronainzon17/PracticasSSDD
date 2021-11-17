@@ -17,7 +17,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
 	"net/rpc"
 	"os"
 	"practica3/com"
@@ -164,8 +163,8 @@ func main() {
 
 	master := new(Master)
 
-	//l, err := net.Listen("tcp", ipPort)
-	//checkError(err)
+	l, err := net.Listen("tcp", ipPort)
+	checkError(err)
 
 	for i := range workers {
 		go sshWorkerUp(workers[i], hostUser, remoteUser)
@@ -174,10 +173,11 @@ func main() {
 		go master.workerControl(workers[i])
 		fmt.Println("connecting to", workers[i])
 	}
+	fmt.Println("SERVING ...")
 
-	rpc.Register(master)
-	rpc.HandleHTTP() //"prepara rutas para el servidor HTTP El servidor HTTP está actuando como proxy
-	l, err := net.Listen("tcp", ipPort)
-	checkError(err)
-	http.Serve(l, nil) //atender la conexión
+	for {
+		rpc.Register(master)
+		rpc.Accept(l)
+	}
+
 }
