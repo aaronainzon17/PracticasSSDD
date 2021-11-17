@@ -57,9 +57,7 @@ func checkError(err error) {
 	}
 }
 
-func isUp(ipW string) {
-
-}
+//Devuelve las direcciones disponibles para lanzar un worker
 func getAvailableDirs() []string {
 	mb := make(map[string]struct{}, len(WORKERS))
 	for _, x := range WORKERS {
@@ -75,8 +73,10 @@ func getAvailableDirs() []string {
 }
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
+	REQUESTS++
 	res := make(chan Reply, 1)
 	requestChan <- Params{interval, res}
+	fmt.Println("Nueva peticion: ", interval)
 	result := <-res
 	if result.err != nil {
 		fmt.Println("Tarea fallida: ", result.err)
@@ -86,6 +86,7 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	*primeList = result.primes
 	return nil
 }
+
 func resourceManager(hostUser string, remoteUser string) {
 	start := time.Now()
 	for {
