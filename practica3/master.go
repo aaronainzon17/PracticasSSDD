@@ -17,6 +17,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"net/rpc"
 	"os"
 	"practica3/com"
@@ -51,7 +52,7 @@ func checkError(err error) {
 }
 
 func (p *Master) FindPrimes(interval com.TPInterval, primeList *[]int) error {
-
+	fmt.Println("LLEGQA UNA PETICION A FIND PRIMES: ", interval)
 	res := make(chan Reply, 1)
 	requestChan <- Params{"PrimesImpl.FindPrimes", interval, res}
 	fmt.Println("NUEVA PETICION REGISTRADA: ", interval)
@@ -163,8 +164,8 @@ func main() {
 
 	master := new(Master)
 
-	l, err := net.Listen("tcp", ipPort)
-	checkError(err)
+	//l, err := net.Listen("tcp", ipPort)
+	//checkError(err)
 
 	for i := range workers {
 		go sshWorkerUp(workers[i], hostUser, remoteUser)
@@ -174,8 +175,9 @@ func main() {
 		fmt.Println("connecting to", workers[i])
 	}
 
-	for {
-		rpc.Register(master)
-		rpc.Accept(l)
-	}
+	rpc.Register(master)
+	rpc.HandleHTTP() //"prepara rutas para el servidor HTTP El servidor HTTP está actuando como proxy
+	l, err := net.Listen("tcp", ipPort)
+	checkError(err)
+	http.Serve(l, nil) //atender la conexión
 }
