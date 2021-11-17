@@ -52,12 +52,9 @@ func checkError(err error) {
 }
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
-	fmt.Println("LLEGQA UNA PETICION A FIND PRIMES: ", interval)
 	res := make(chan Reply, 1)
 	requestChan <- PrimesImpl{interval, res}
-	fmt.Println("NUEVA PETICION REGISTRADA: ", interval)
 	result := <-res
-
 	if result.err != nil {
 		fmt.Println("Tarea fallida: ", result.err)
 		return result.err
@@ -85,6 +82,8 @@ func workerControl(workerIp string) {
 						job.ReplyChan <- Reply{primes: reply, err: rep.Error}
 					}
 				}
+			} else {
+				fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
 			}
 		}
 	}
