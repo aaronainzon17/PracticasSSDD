@@ -261,6 +261,7 @@ func main() {
 	}
 
 	go workerManager(hostUser, remoteUser)
+	go resourceManager(hostUser, remoteUser)
 
 	fmt.Println("SERVING ...")
 
