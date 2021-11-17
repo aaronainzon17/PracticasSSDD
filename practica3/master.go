@@ -257,6 +257,7 @@ func main() {
 		time.Sleep(5000 * time.Millisecond)
 		go workerControl(WORKERS[i])
 		MAXWORKERS++
+		NWORKERSUP++
 		fmt.Println("connecting to", WORKERS[i])
 	}
 
