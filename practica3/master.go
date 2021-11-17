@@ -68,23 +68,23 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 }
 
 func workerControl(workerIp string) {
-
+	var reply []int
 	for {
-		job := <-requestChan // Recibe un tabajo del canal
-		fmt.Println(job)
-
-		// Se establece una conexion TCP con el worker
-		workerCon, err := rpc.DialHTTP("tcp", workerIp)
-		checkError(err)
-
-		// Asynchronous call
-		var reply []int
-		divCall := workerCon.Go("PrimesImpl.FindPrimes", job.Interval, &reply, nil)
 		select {
-		//Caso en el que el worker acaba correctamente
-		case rep := <-divCall.Done:
-			if rep.Error == nil { //Si no hay error se guarda la respuesta en el tipo Reply
-				job.ReplyChan <- Reply{primes: reply, err: rep.Error}
+		case job := <-requestChan: // Recibe un tabajo del canal
+			fmt.Println(job)
+			// Se establece una conexion TCP con el worker
+			workerCon, err := rpc.DialHTTP("tcp", workerIp)
+			if err == nil { // Si no hay error
+				// Asynchronous call
+				divCall := workerCon.Go("PrimesImpl.FindPrimes", job.Interval, &reply, nil)
+				select {
+				//Caso en el que el worker acaba correctamente
+				case rep := <-divCall.Done:
+					if rep.Error == nil { //Si no hay error se guarda la respuesta en el tipo Reply
+						job.ReplyChan <- Reply{primes: reply, err: rep.Error}
+					}
+				}
 			}
 		}
 	}
