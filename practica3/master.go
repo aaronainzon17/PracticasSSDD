@@ -1,12 +1,8 @@
 /*
-* AUTOR: Angel Espinosa (775750), Aaron Ibañez (779088)
 *
-* La arquitectura cliente servidor secuencial consiste en un servidor que atien-
-* de peticiones de forma secuencial, de una en una, de manera que cuando llegan
-* varias peticiones, atiende una de ellas (a menudo la primera en llegar) y, una vez
-* terminada, atiende la siguiente. Para reducir el tiempo de espera de los clientes,
-* siempre que haya recursos hardware suficientes en el servidor y siempre que la apli-
-* caci ́on lo permita, sse puede utilizar la arquitectura cliente-servidor concurrente
+* AUTOR: Angel Espinosa (775750), Aaron Ibañez (779088)
+* FICHERO: master.go
+*
  */
 
 package main
@@ -66,9 +62,11 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 
 func workerControl(workerIp string) {
 	var reply []int
-	for {
+	fin := false
+	for !fin {
 		select {
-		case job := <-requestChan: // Recibe un tabajo del canal
+		// Recibe un tabajo del canal
+		case job := <-requestChan:
 			// Se establece una conexion TCP con el worker
 			workerCon, err := rpc.DialHTTP("tcp", workerIp)
 			if err == nil { // Si no hay error
@@ -77,9 +75,17 @@ func workerControl(workerIp string) {
 				select {
 				//Caso en el que el worker acaba correctamente
 				case rep := <-divCall.Done:
-					if rep.Error == nil { //Si no hay error se guarda la respuesta en el tipo Reply
+					//Si no hay error se guarda la respuesta en el tipo Reply
+					if rep.Error == nil {
 						job.ReplyChan <- Reply{primes: reply, err: rep.Error}
+					} else {
+						//Se guarda fallo
+						job.ReplyChan <- Reply{reply, fmt.Errorf("Crash")}
+						fmt.Println("Goroutine exiting on worker ")
+						fin = true
 					}
+				case <-time.After(3 * time.Second):
+					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
 				}
 			} else {
 				fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
@@ -143,7 +149,7 @@ func sshWorkerUp(worker string, hostUser string, remoteUser string) {
 	}
 	res1 := strings.Split(worker, ":")
 	cmd := "./worker " + worker + " &"
-	fmt.Println("Comando:", cmd)
+	//fmt.Println("Comando:", cmd)
 	err = runCmd(cmd, res1[0], config)
 	checkError(err)
 }
@@ -163,7 +169,6 @@ func main() {
 	for i := range workers {
 		go sshWorkerUp(workers[i], hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
-		//fmt.Println(res)
 		go workerControl(workers[i])
 		fmt.Println("connecting to", workers[i])
 	}
