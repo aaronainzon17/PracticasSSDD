@@ -17,6 +17,7 @@ import (
 	"net/rpc"
 	"os"
 	"practica3/com"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,12 +40,39 @@ type PrimesImpl struct {
 }
 
 var requestChan = make(chan PrimesImpl, 100) //canal para los trabajos
+var IPWORKERS = make(chan string)            //canal para que workermanager envíe ips de workers
+var MAXWORKERS = 0                           // Numero maximo de workers del sistema
+var WORKERS []string                         //Ips de los workers
+
+var NWORKERSUP = 0 // Numero de workers activos
+var IPWORKERSUP []string
+
+var DELAYED = 0
+var CRASHED = 0
+var REQUESTS = 0
 
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
 		os.Exit(1)
 	}
+}
+
+func isUp(ipW string) {
+
+}
+func getAvailableDirs() []string {
+	mb := make(map[string]struct{}, len(WORKERS))
+	for _, x := range WORKERS {
+		mb[x] = struct{}{}
+	}
+	var diff []string
+	for _, x := range IPWORKERSUP {
+		if _, found := mb[x]; !found {
+			diff = append(diff, x)
+		}
+	}
+	return diff
 }
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
@@ -58,6 +86,60 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	fmt.Println("Tarea completada: ", interval)
 	*primeList = result.primes
 	return nil
+}
+func resourceManager(hostUser string, remoteUser string) {
+	start := time.Now()
+	for {
+		time.Sleep(10 * time.Second)
+		fmt.Println("Número de peticiones: " + strconv.Itoa(REQUESTS))
+		fmt.Println("Número de workers: " + strconv.Itoa(NWORKERSUP))
+		fmt.Println("Numero de delay/omission: " + strconv.Itoa(DELAYED))
+		fmt.Println("Numero de crash: " + strconv.Itoa(CRASHED))
+		fmt.Println(time.Since(start))
+		REQUESTS = 0
+		nEnqueuedReq := len(requestChan)
+		// Si el numero de peticiones en el canal es 0 se elimina un worker, ya que se considera
+		// que el numero de peticiones restantes por atender se pueden atender garantizando el QoS
+		// con un worker menos
+		if nEnqueuedReq == 0 {
+			if NWORKERSUP > 1 {
+				workerDir := IPWORKERSUP[len(IPWORKERSUP)-1]   //Lee el ultimo elemento del slice
+				IPWORKERSUP = IPWORKERSUP[:len(IPWORKERSUP)-1] //Elimina el ultimo elemento del slice
+
+				workerConn, err := rpc.DialHTTP("tcp", workerDir)
+				if err == nil {
+					var res int
+					workerConn.Go("PrimesImpl.Stop", 1, &res, nil)
+				}
+				NWORKERSUP--
+			}
+			// Si hay peticiones en el canal se entiende que el numero de workers activos no son suficientes
+			// para sartisfacer la demanda por lo que se levanta un worker mas
+		} else {
+			if NWORKERSUP != MAXWORKERS {
+
+				availableDirs := getAvailableDirs()
+				dir := availableDirs[len(availableDirs)-1]
+
+				go sshWorkerUp(dir, hostUser, remoteUser)
+				time.Sleep(5000 * time.Millisecond)
+				go workerControl(dir)
+				NWORKERSUP++                           // Se anyade un worker mas al contador
+				IPWORKERSUP = append(IPWORKERSUP, dir) //Se anyade la ip del worker a la lista de workers up
+			}
+		}
+	}
+}
+
+//Si te caes te levantas
+func workerManager(hostUser string, remoteUser string) {
+	for {
+		workerIp := <-IPWORKERS
+		go sshWorkerUp(workerIp, hostUser, remoteUser)
+		time.Sleep(5000 * time.Millisecond)
+		go workerControl(workerIp)
+		fmt.Println("Reconnecting to", workerIp)
+	}
 }
 
 func workerControl(workerIp string) {
@@ -80,12 +162,16 @@ func workerControl(workerIp string) {
 						job.ReplyChan <- Reply{primes: reply, err: rep.Error}
 					} else {
 						//Se guarda fallo
-						job.ReplyChan <- Reply{reply, fmt.Errorf("Crash")}
-						fmt.Println("Goroutine exiting on worker ")
+						job.ReplyChan <- Reply{reply, fmt.Errorf("Worker crashed")}
+						CRASHED++
+						//fmt.Println("Goroutine exiting on worker ")
+						//Se envia la direccion del worker caido por el canal para intentar levantarlo
+						IPWORKERS <- workerIp
 						fin = true
 					}
 				case <-time.After(3 * time.Second):
 					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
+					DELAYED++
 				}
 			} else {
 				fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
@@ -100,17 +186,17 @@ func readFile(path string) []string {
 	f, err := os.Open(path)
 	checkError(err)
 
-	var workers []string
+	var ips []string
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		workers = append(workers, scanner.Text())
+		ips = append(ips, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
 
 	f.Close()
-	return workers
+	return ips
 }
 
 func runCmd(cmd string, client string, s *ssh.ClientConfig) error {
@@ -162,16 +248,20 @@ func main() {
 	//Ip y pueto del worker
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
-	workers := readFile(os.Args[2])
+	WORKERS = readFile(os.Args[2])
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
-	for i := range workers {
-		go sshWorkerUp(workers[i], hostUser, remoteUser)
+	for i := range WORKERS {
+		go sshWorkerUp(WORKERS[i], hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
-		go workerControl(workers[i])
-		fmt.Println("connecting to", workers[i])
+		go workerControl(WORKERS[i])
+		MAXWORKERS++
+		fmt.Println("connecting to", WORKERS[i])
 	}
+
+	go workerManager(hostUser, remoteUser)
+
 	fmt.Println("SERVING ...")
 
 	primesImpl := new(PrimesImpl)
