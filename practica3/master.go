@@ -141,6 +141,8 @@ func main() {
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
+	master := new(Params)
+
 	l, err := net.Listen("tcp", ipPort)
 	checkError(err)
 
@@ -153,7 +155,7 @@ func main() {
 	}
 
 	for {
-		rpc.Register(loadChan)
+		rpc.Register(master)
 		rpc.Accept(l)
 	}
 }
