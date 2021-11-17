@@ -69,7 +69,6 @@ func workerControl(workerIp string) {
 	for {
 		select {
 		case job := <-requestChan: // Recibe un tabajo del canal
-			fmt.Println(job)
 			// Se establece una conexion TCP con el worker
 			workerCon, err := rpc.DialHTTP("tcp", workerIp)
 			if err == nil { // Si no hay error
