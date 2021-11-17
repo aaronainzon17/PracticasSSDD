@@ -17,7 +17,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
 	"net/rpc"
 	"os"
 	"practica3/com"
@@ -176,10 +175,13 @@ func main() {
 	}
 	fmt.Println("SERVING ...")
 
-	//rpc.Accept(l)
-	rpc.Register(master)
-	fmt.Println("Registro una peticion")
-	rpc.HandleHTTP()
-	http.Serve(l, nil)
+	for {
+		rpc.Accept(l)
+		rpc.Register(master)
+		fmt.Println("Registro una peticion")
+	}
+
+	//rpc.HandleHTTP()
+	//http.Serve(l, nil)
 
 }
