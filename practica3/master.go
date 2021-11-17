@@ -26,6 +26,10 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+type Master struct {
+	//mutex sync.Mutex
+}
+
 type Reply struct {
 	primes []int
 	err    error
@@ -37,7 +41,7 @@ type Params struct {
 	ReplyChan chan Reply
 }
 
-var loadChan = make(chan Params, 100) //canal para los trabajos
+var requestChan = make(chan Params, 100) //canal para los trabajos
 
 func checkError(err error) {
 	if err != nil {
@@ -46,10 +50,26 @@ func checkError(err error) {
 	}
 }
 
-func workerControl(workerIp string) {
+func (p *Master) FindPrimes(interval com.TPInterval, primeList *[]int) error {
+
+	res := make(chan Reply, 1)
+	requestChan <- Params{"PrimesImpl.FindPrimes", interval, res}
+	fmt.Println("NUEVA PETICION REGISTRADA: ", interval)
+	result := <-res
+
+	if result.err != nil {
+		fmt.Println("Tarea fallida: ", result.err)
+		return result.err
+	}
+	fmt.Println("Tarea completada: ", interval)
+	*primeList = result.primes
+	return nil
+}
+
+func (P *Master) workerControl(workerIp string) {
 
 	for {
-		job := <-loadChan // Recibe un tabajo del canal
+		job := <-requestChan // Recibe un tabajo del canal
 		fmt.Println(job)
 
 		// Se establece una conexion TCP con el worker
@@ -141,7 +161,7 @@ func main() {
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
-	master := new(Params)
+	master := new(Master)
 
 	l, err := net.Listen("tcp", ipPort)
 	checkError(err)
@@ -150,7 +170,7 @@ func main() {
 		go sshWorkerUp(workers[i], hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
 		//fmt.Println(res)
-		go workerControl(workers[i])
+		go master.workerControl(workers[i])
 		fmt.Println("connecting to", workers[i])
 	}
 
