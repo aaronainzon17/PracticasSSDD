@@ -249,6 +249,7 @@ func main() {
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
 	WORKERS = readFile(os.Args[2])
+	IPWORKERSUP = WORKERS
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
