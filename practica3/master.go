@@ -36,13 +36,13 @@ type Reply struct {
 	err    error
 }
 
-type Params struct {
+type PrimesImpl struct {
 	//Op2ex     string
 	Interval  com.TPInterval
 	ReplyChan chan Reply
 }
 
-var requestChan = make(chan Params, 100) //canal para los trabajos
+var requestChan = make(chan PrimesImpl, 100) //canal para los trabajos
 
 func checkError(err error) {
 	if err != nil {
@@ -51,10 +51,10 @@ func checkError(err error) {
 	}
 }
 
-func (p *Master) FindPrimes(interval com.TPInterval, primeList *[]int) error {
+func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
 	fmt.Println("LLEGQA UNA PETICION A FIND PRIMES: ", interval)
 	res := make(chan Reply, 1)
-	requestChan <- Params{interval, res}
+	requestChan <- PrimesImpl{interval, res}
 	fmt.Println("NUEVA PETICION REGISTRADA: ", interval)
 	result := <-res
 
