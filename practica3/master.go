@@ -176,7 +176,7 @@ func main() {
 	fmt.Println("SERVING ...")
 
 	for {
-		rpc.Accept(l)
+		//rpc.Accept(l)
 		rpc.Register(master)
 		fmt.Println("Registro una peticion")
 	}
