@@ -24,25 +24,24 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-/*type Master struct {
-	//mutex sync.Mutex
-}*/
+type PrimesImpl struct {
+}
 
 type Reply struct {
 	primes []int
 	err    error
 }
 
-type PrimesImpl struct {
-	//Op2ex     string
+type Params struct {
 	Interval  com.TPInterval
 	ReplyChan chan Reply
 }
 
-var requestChan = make(chan PrimesImpl, 100) //canal para los trabajos
-var IPWORKERS = make(chan string)            //canal para que workermanager envíe ips de workers
-var MAXWORKERS = 0                           // Numero maximo de workers del sistema
-var WORKERS []string                         //Ips de los workers
+var requestChan = make(chan Params, 100) //canal para los trabajos
+var IPWORKERS = make(chan string)        //canal para que workermanager envíe ips de workers
+var MAXWORKERS = 0                       // Numero maximo de workers del sistema
+var MINWORKERS = 2                       //Numero minimo de workers del sistema
+var WORKERS []string                     //Ips de los workers
 
 var NWORKERSUP = 0 // Numero de workers activos
 var IPWORKERSUP []string
@@ -77,7 +76,7 @@ func getAvailableDirs() []string {
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
 	res := make(chan Reply, 1)
-	requestChan <- PrimesImpl{interval, res}
+	requestChan <- Params{interval, res}
 	result := <-res
 	if result.err != nil {
 		fmt.Println("Tarea fallida: ", result.err)
@@ -146,57 +145,58 @@ func workerControl(workerIp string) {
 	var reply []int
 	fin := false
 	for !fin {
-		select {
 		// Recibe un tabajo del canal
-		case job := <-requestChan:
-			// Se establece una conexion TCP con el worker
-			workerCon, err := rpc.DialHTTP("tcp", workerIp)
-			if err == nil { // Si no hay error
-				// Asynchronous call
-				divCall := workerCon.Go("PrimesImpl.FindPrimes", job.Interval, &reply, nil)
-				select {
-				//Caso en el que el worker acaba correctamente
-				case rep := <-divCall.Done:
-					//Si no hay error se guarda la respuesta en el tipo Reply
-					if rep.Error == nil {
-						job.ReplyChan <- Reply{primes: reply, err: rep.Error}
-					} else {
-						//Se guarda fallo
-						CRASHED++
-						job.ReplyChan <- Reply{reply, fmt.Errorf("Worker crashed")}
-						//Se envia la direccion del worker caido por el canal para intentar levantarlo
-						IPWORKERS <- workerIp
-						fin = true
-					}
-				case <-time.After(3 * time.Second):
-					DELAYED++
-					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
-
+		job := <-requestChan
+		// Se establece una conexion TCP con el worker
+		workerCon, err := rpc.DialHTTP("tcp", workerIp)
+		if err == nil { // Si no hay error
+			// Asynchronous call
+			divCall := workerCon.Go("PrimesImpl.FindPrimes", job.Interval, &reply, nil)
+			select {
+			//Caso en el que el worker acaba correctamente
+			case rep := <-divCall.Done:
+				//Si no hay error se guarda la respuesta en el tipo Reply
+				if rep.Error == nil {
+					job.ReplyChan <- Reply{primes: reply, err: rep.Error}
+				} else {
+					//Se guarda fallo
+					CRASHED++
+					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker crashed")}
+					//Se envia la direccion del worker caido por el canal para intentar levantarlo
+					IPWORKERS <- workerIp
+					fin = true
 				}
-			} else {
-				fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
+			case <-time.After(3 * time.Second):
+				DELAYED++
+				job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
+
+			default:
+				fmt.Println("Entra al default del select")
 			}
+		} else {
+			fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
 		}
 	}
 }
 
-func readFile(path string) []string {
+func readFile(path string) ([]string, int) {
 	fmt.Println("entra a leer el fichero ", path)
 
 	f, err := os.Open(path)
 	checkError(err)
-
+	nWorkers := 0
 	var ips []string
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		ips = append(ips, scanner.Text())
+		nWorkers++
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
 
 	f.Close()
-	return ips
+	return ips, nWorkers
 }
 
 func runCmd(cmd string, client string, s *ssh.ClientConfig) error {
@@ -248,17 +248,16 @@ func main() {
 	//Ip y pueto del worker
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
-	WORKERS = readFile(os.Args[2])
-	IPWORKERSUP = WORKERS
+	WORKERS, MAXWORKERS = readFile(os.Args[2])
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
-	for i := range WORKERS {
+	for i := 0; i < MINWORKERS; i++ {
 		go sshWorkerUp(WORKERS[i], hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
 		go workerControl(WORKERS[i])
-		MAXWORKERS++
 		NWORKERSUP++
+		IPWORKERSUP = append(IPWORKERSUP, WORKERS[i])
 		fmt.Println("connecting to", WORKERS[i])
 	}
 
@@ -273,5 +272,4 @@ func main() {
 	l, err := net.Listen("tcp", ipPort)
 	checkError(err)
 	http.Serve(l, nil)
-
 }
