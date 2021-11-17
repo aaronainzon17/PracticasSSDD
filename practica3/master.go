@@ -37,7 +37,7 @@ type Reply struct {
 }
 
 type Params struct {
-	Op2ex     string
+	//Op2ex     string
 	Interval  com.TPInterval
 	ReplyChan chan Reply
 }
@@ -54,7 +54,7 @@ func checkError(err error) {
 func (p *Master) FindPrimes(interval com.TPInterval, primeList *[]int) error {
 	fmt.Println("LLEGQA UNA PETICION A FIND PRIMES: ", interval)
 	res := make(chan Reply, 1)
-	requestChan <- Params{"PrimesImpl.FindPrimes", interval, res}
+	requestChan <- Params{interval, res}
 	fmt.Println("NUEVA PETICION REGISTRADA: ", interval)
 	result := <-res
 
@@ -79,7 +79,7 @@ func (P *Master) workerControl(workerIp string) {
 
 		// Asynchronous call
 		var reply []int
-		divCall := workerCon.Go(job.Op2ex, job.Interval, &reply, nil)
+		divCall := workerCon.Go("PrimesImpl.FindPrimes", job.Interval, &reply, nil)
 		select {
 		//Caso en el que el worker acaba correctamente
 		case rep := <-divCall.Done:
@@ -144,7 +144,7 @@ func sshWorkerUp(worker string, hostUser string, remoteUser string) {
 		},
 	}
 	res1 := strings.Split(worker, ":")
-	cmd := "cd /home/a779088/cuarto/PracticasSSDD/practica3 && ./worker " + worker + " &"
+	cmd := "./worker " + worker + " &"
 	fmt.Println("Comando:", cmd)
 	err = runCmd(cmd, res1[0], config)
 	checkError(err)
