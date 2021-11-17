@@ -101,7 +101,7 @@ func resourceManager(hostUser string, remoteUser string) {
 		// que el numero de peticiones restantes por atender se pueden atender garantizando el QoS
 		// con un worker menos
 		if nEnqueuedReq == 0 {
-			if NWORKERSUP > 1 {
+			if NWORKERSUP > MINWORKERS {
 				workerDir := IPWORKERSUP[len(IPWORKERSUP)-1]   //Lee el ultimo elemento del slice
 				IPWORKERSUP = IPWORKERSUP[:len(IPWORKERSUP)-1] //Elimina el ultimo elemento del slice
 
@@ -169,9 +169,6 @@ func workerControl(workerIp string) {
 			case <-time.After(3 * time.Second):
 				DELAYED++
 				job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
-
-			default:
-				fmt.Println("Entra al default del select")
 			}
 		} else {
 			fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
