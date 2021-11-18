@@ -279,8 +279,8 @@ func main() {
 		IPWORKERSUP = append(IPWORKERSUP, WORKERS[i])
 	}
 
-	//go workerManager(hostUser, remoteUser)
-	//go resourceManager(hostUser, remoteUser)
+	go workerManager(hostUser, remoteUser)
+	go resourceManager(hostUser, remoteUser)
 
 	fmt.Println("SERVING ...")
 	fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
