@@ -173,7 +173,7 @@ func workerControl(workerIp string) {
 					//Se guarda fallo
 					CRASHED++
 					//Se envia la direccion del worker caido por el canal para intentar levantarlo
-					//IPWORKERS <- workerIp
+					IPWORKERS <- workerIp
 					fin = true
 					job.err <- err
 				}
