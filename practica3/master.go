@@ -161,7 +161,7 @@ func workerControl(workerIp string) {
 			// Asynchronous call
 			errCh := make(chan error)
 
-			errCh <- workerCon.Call("PrimesImpl.FindPrimes", job.Interval, job.primes, nil)
+			errCh <- workerCon.Call("PrimesImpl.FindPrimes", job.Interval, job.primes)
 			select {
 			//Caso en el que el worker acaba correctamente
 			case rep := <-errCh:
