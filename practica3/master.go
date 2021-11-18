@@ -27,14 +27,15 @@ import (
 type PrimesImpl struct {
 }
 
-type Reply struct {
+/*type Reply struct {
 	primes []int
 	err    error
-}
+}*/
 
 type Params struct {
-	Interval  com.TPInterval
-	ReplyChan chan Reply
+	Interval com.TPInterval
+	primes   *[]int
+	err      chan error
 }
 
 var requestChan = make(chan Params, 100) //canal para los trabajos
@@ -53,7 +54,7 @@ var REQUESTS = 0
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
-		//os.Exit(1)
+		os.Exit(1)
 	}
 }
 
@@ -74,17 +75,22 @@ func getAvailableDirs() []string {
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
 	REQUESTS++
-	res := make(chan Reply, 1)
-	requestChan <- Params{interval, res}
+	res := make(chan error)
+	requestChan <- Params{interval, primeList, res}
 	fmt.Println("Nueva peticion: ", interval)
-	result := <-res
-	if result.err != nil {
-		fmt.Println("Tarea fallida: ", result.err)
-		return result.err
+	for {
+		if hayErr := <-res; hayErr != nil {
+			//Ha habido error
+			res = make(chan error)
+			requestChan <- Params{interval, primeList, res}
+			fmt.Println("Tarea fallida: ", hayErr)
+		} else {
+			//No ha habido error
+			fmt.Println("Tarea completada: ", interval)
+			return nil
+		}
 	}
-	fmt.Println("Tarea completada: ", interval)
-	*primeList = result.primes
-	return nil
+
 }
 
 func resourceManager(hostUser string, remoteUser string) {
@@ -156,20 +162,22 @@ func workerControl(workerIp string) {
 			select {
 			//Caso en el que el worker acaba correctamente
 			case rep := <-divCall.Done:
-				//Si no hay error se guarda la respuesta en el tipo Reply
 				if rep.Error == nil {
-					job.ReplyChan <- Reply{primes: reply, err: rep.Error}
+					//Si no hay error se pone a nil el campo error de la peticion
+					job.err <- nil
 				} else {
 					//Se guarda fallo
 					CRASHED++
-					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker crashed")}
 					//Se envia la direccion del worker caido por el canal para intentar levantarlo
 					IPWORKERS <- workerIp
+					job.err <- rep.Error
+
 					fin = true
 				}
 			case <-time.After(3 * time.Second):
 				DELAYED++
-				job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
+				//Caso de delay u omision
+				job.err <- nil //Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
 			}
 		} else {
 			fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
@@ -262,12 +270,17 @@ func main() {
 	go workerManager(hostUser, remoteUser)
 	go resourceManager(hostUser, remoteUser)
 
-	fmt.Println("SERVING ...")
-
 	primesImpl := new(PrimesImpl)
 	rpc.Register(primesImpl)
 	rpc.HandleHTTP()
 	l, err := net.Listen("tcp", ipPort)
 	checkError(err)
 	http.Serve(l, nil)
+
+	fmt.Println("SERVING ...")
+	fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
+	fmt.Println("MINWORKERS: ", MINWORKERS) //Numero minimo de workers del sistema
+	fmt.Println("WORKERS: ", WORKERS)       //Ips de los workers
+	fmt.Println("NWORKERSUP: ", NWORKERSUP) // Numero de workers activos
+	fmt.Println("IPWORKERSUP", IPWORKERSUP) //Ips de los workers levantados
 }
