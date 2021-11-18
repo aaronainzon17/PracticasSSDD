@@ -174,10 +174,11 @@ func workerControl(workerIp string) {
 
 					fin = true
 				}
-			case <-time.After(3 * time.Second):
+			case <-time.After(3000 * time.Millisecond):
 				DELAYED++
 				//Caso de delay u omision
 				job.err <- nil //Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
+				fin = true
 			}
 		} else {
 			fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
@@ -267,15 +268,8 @@ func main() {
 		fmt.Println("connecting to", WORKERS[i])
 	}
 
-	go workerManager(hostUser, remoteUser)
-	go resourceManager(hostUser, remoteUser)
-
-	primesImpl := new(PrimesImpl)
-	rpc.Register(primesImpl)
-	rpc.HandleHTTP()
-	l, err := net.Listen("tcp", ipPort)
-	checkError(err)
-	http.Serve(l, nil)
+	//go workerManager(hostUser, remoteUser)
+	//go resourceManager(hostUser, remoteUser)
 
 	fmt.Println("SERVING ...")
 	fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
@@ -283,4 +277,11 @@ func main() {
 	fmt.Println("WORKERS: ", WORKERS)       //Ips de los workers
 	fmt.Println("NWORKERSUP: ", NWORKERSUP) // Numero de workers activos
 	fmt.Println("IPWORKERSUP", IPWORKERSUP) //Ips de los workers levantados
+
+	primesImpl := new(PrimesImpl)
+	rpc.Register(primesImpl)
+	rpc.HandleHTTP()
+	l, err := net.Listen("tcp", ipPort)
+	checkError(err)
+	http.Serve(l, nil)
 }
