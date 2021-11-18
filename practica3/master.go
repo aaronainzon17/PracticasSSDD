@@ -151,7 +151,6 @@ func workerManager(hostUser string, remoteUser string) {
 }
 
 func workerControl(workerIp string) {
-	var reply []int
 	fin := false
 	for !fin {
 		// Recibe un tabajo del canal
@@ -160,11 +159,13 @@ func workerControl(workerIp string) {
 		workerCon, err := rpc.DialHTTP("tcp", workerIp)
 		if err == nil { // Si no hay error
 			// Asynchronous call
-			divCall := workerCon.Go("PrimesImpl.FindPrimes", job.Interval, &reply, nil)
+			errCh := make(chan error)
+
+			errCh <- workerCon.Call("PrimesImpl.FindPrimes", job.Interval, job.primes, nil)
 			select {
 			//Caso en el que el worker acaba correctamente
-			case rep := <-divCall.Done:
-				if rep.Error == nil {
+			case rep := <-errCh:
+				if rep == nil {
 					//Si no hay error se pone a nil el campo error de la peticion
 					job.err <- nil
 				} else {
@@ -172,7 +173,7 @@ func workerControl(workerIp string) {
 					CRASHED++
 					//Se envia la direccion del worker caido por el canal para intentar levantarlo
 					//IPWORKERS <- workerIp
-					job.err <- rep.Error
+					job.err <- err
 
 					fin = true
 				}
