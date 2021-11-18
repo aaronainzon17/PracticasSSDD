@@ -250,6 +250,7 @@ func sshWorkerUp(worker string, hostUser string, remoteUser string) {
 }
 
 func main() {
+
 	if len(os.Args) < 5 {
 		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file> <hostUser> <remoteUser>\n")
 		os.Exit(1)
@@ -261,13 +262,19 @@ func main() {
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
+	primesImpl := new(PrimesImpl)
+	rpc.Register(primesImpl)
+	rpc.HandleHTTP()
+	l, err := net.Listen("tcp", ipPort)
+	checkError(err)
+
 	for i := 0; i < MINWORKERS; i++ {
+		fmt.Println("connecting to", WORKERS[i])
 		go sshWorkerUp(WORKERS[i], hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
 		go workerControl(WORKERS[i])
 		NWORKERSUP++
 		IPWORKERSUP = append(IPWORKERSUP, WORKERS[i])
-		fmt.Println("connecting to", WORKERS[i])
 	}
 
 	//go workerManager(hostUser, remoteUser)
@@ -280,10 +287,5 @@ func main() {
 	fmt.Println("NWORKERSUP: ", NWORKERSUP) // Numero de workers activos
 	fmt.Println("IPWORKERSUP", IPWORKERSUP) //Ips de los workers levantados
 
-	primesImpl := new(PrimesImpl)
-	rpc.Register(primesImpl)
-	rpc.HandleHTTP()
-	l, err := net.Listen("tcp", ipPort)
-	checkError(err)
 	http.Serve(l, nil)
 }
