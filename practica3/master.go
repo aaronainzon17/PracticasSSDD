@@ -81,10 +81,10 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	fin := false
 	for !fin {
 		if hayErr := <-res; hayErr != nil {
+			fmt.Println("Tarea fallida: ", hayErr)
 			//Ha habido error
 			res = make(chan error)
 			requestChan <- Params{interval, primeList, res}
-			fmt.Println("Tarea fallida: ", hayErr)
 		} else {
 			//No ha habido error
 			fmt.Println("Tarea completada: ", interval)
