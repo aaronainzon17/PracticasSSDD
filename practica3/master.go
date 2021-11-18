@@ -79,8 +79,10 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	requestChan <- Params{interval, primeList, res}
 	fmt.Println("Nueva peticion: ", interval)
 	fin := false
+	var hayErr error
 	for !fin {
-		if hayErr := <-res; hayErr != nil {
+		hayErr = <-res
+		if hayErr != nil {
 			fmt.Println("Tarea fallida: ", hayErr)
 			//Ha habido error
 			res = make(chan error)
@@ -91,7 +93,7 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 			fin = true
 		}
 	}
-	return nil
+	return hayErr
 
 }
 
@@ -160,7 +162,6 @@ func workerControl(workerIp string) {
 		if err == nil { // Si no hay error
 			// Asynchronous call
 			errCh := make(chan error)
-
 			errCh <- workerCon.Call("PrimesImpl.FindPrimes", job.Interval, job.primes)
 			select {
 			//Caso en el que el worker acaba correctamente
@@ -173,15 +174,15 @@ func workerControl(workerIp string) {
 					CRASHED++
 					//Se envia la direccion del worker caido por el canal para intentar levantarlo
 					//IPWORKERS <- workerIp
-					job.err <- err
-
 					fin = true
+					job.err <- err
 				}
 			case <-time.After(3000 * time.Millisecond):
 				DELAYED++
 				//Caso de delay u omision
-				job.err <- nil //Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
 				fin = true
+				job.err <- nil //Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
+
 			}
 		} else {
 			fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
