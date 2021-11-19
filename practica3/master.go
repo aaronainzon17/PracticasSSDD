@@ -54,7 +54,7 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	if result.err != nil {
 		fmt.Println("Tarea fallida: ", result.err)
 		//Se envia que la tarea ha fallado y se vuelve a encolar
-		//requestChan <- PrimesImpl{interval, res}
+		requestChan <- PrimesImpl{interval, res}
 		return result.err
 	}
 	fmt.Println("Tarea completada: ", interval)
@@ -79,7 +79,7 @@ func workerControl(workerIp string) {
 				case rep := <-divCall.Done:
 					//Si no hay error se guarda la respuesta en el tipo Reply
 					if rep.Error == nil {
-						job.ReplyChan <- Reply{primes: reply, err: rep.Error}
+						job.ReplyChan <- Reply{primes: reply, err: nil}
 					} else {
 						//Se guarda fallo
 						job.ReplyChan <- Reply{reply, fmt.Errorf("Crash")}
@@ -87,6 +87,7 @@ func workerControl(workerIp string) {
 						fin = true
 					}
 				case <-time.After(3 * time.Second):
+					//Caso en el que salta la alarma programada por el time.After
 					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
 				}
 			} else {
@@ -150,7 +151,7 @@ func sshWorkerUp(worker string, hostUser string, remoteUser string) {
 		},
 	}
 	res1 := strings.Split(worker, ":")
-	cmd := "./worker " + worker + " &"
+	cmd := "cd /home/a779088/cuarto/PracticasSSDD/practica3 && /usr/local/go/bin/go run worker.go " + worker + " &"
 	//fmt.Println("Comando:", cmd)
 	err = runCmd(cmd, res1[0], config)
 	checkError(err)
@@ -180,7 +181,9 @@ func main() {
 	rpc.Register(primesImpl)
 	rpc.HandleHTTP()
 	l, err := net.Listen("tcp", ipPort)
-	checkError(err)
+	if err != nil {
+		fmt.Println("Listen error:", err)
+	}
 	http.Serve(l, nil)
 
 }
