@@ -79,6 +79,7 @@ func workerControl(workerIp string) {
 					if rep.Error == nil {
 						job.ReplyChan <- Reply{reply, nil, w[len(w)-1]}
 					} else {
+						fmt.Println("Fallo por CRASH")
 						//Se guarda fallo
 						job.ReplyChan <- Reply{reply, fmt.Errorf("Crash"), w[len(w)-1]}
 						fmt.Println("Goroutine exiting on worker ")
@@ -86,6 +87,7 @@ func workerControl(workerIp string) {
 					}
 				case <-time.After(3 * time.Second):
 					//Caso en el que salta la alarma programada por el time.After
+					fmt.Println("Fallo por DELAY/OMISION")
 					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision"), w[len(w)-1]}
 				}
 			} else {
