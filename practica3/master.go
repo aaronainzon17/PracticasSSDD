@@ -36,11 +36,11 @@ type PrimesImpl struct {
 	ReplyChan chan Reply
 }
 
-var requestChan chan PrimesImpl //canal para los trabajos
-var IPWORKERS chan string       //canal para que workermanager envíe ips de workers
-var MAXWORKERS = 0              // Numero maximo de workers del sistema
-var MINWORKERS = 2              //Numero minimo de workers del sistema
-var WORKERS []string            //Ips de los workers
+var requestChan = make(chan PrimesImpl, 100) //canal para los trabajos
+var IPWORKERS = make(chan string)            //canal para que workermanager envíe ips de workers
+var MAXWORKERS = 0                           // Numero maximo de workers del sistema
+var MINWORKERS = 2                           //Numero minimo de workers del sistema
+var WORKERS []string                         //Ips de los workers
 
 var NWORKERSUP = 0 // Numero de workers activos
 var IPWORKERSUP []string
@@ -116,7 +116,7 @@ func resourceManager(hostUser string, remoteUser string) {
 		// Si el numero de peticiones en el canal es 0 se elimina un worker, ya que se considera
 		// que el numero de peticiones restantes por atender se pueden atender garantizando el QoS
 		// con un worker menos
-		if nEnqueuedReq == 0 {
+		if nEnqueuedReq <= 0 {
 			if NWORKERSUP > MINWORKERS {
 				workerDir := IPWORKERSUP[len(IPWORKERSUP)-1]   //Lee el ultimo elemento del slice
 				IPWORKERSUP = IPWORKERSUP[:len(IPWORKERSUP)-1] //Elimina el ultimo elemento del slice
@@ -132,10 +132,9 @@ func resourceManager(hostUser string, remoteUser string) {
 			// para sartisfacer la demanda por lo que se levanta un worker mas
 		} else {
 			if NWORKERSUP < MAXWORKERS {
-
 				availableDirs := difference(WORKERS, IPWORKERSUP)
 				dir := availableDirs[len(availableDirs)-1]
-
+				fmt.Println("Se lanza un worker en: ", dir)
 				go sshWorkerUp(dir, hostUser, remoteUser)
 				time.Sleep(5000 * time.Millisecond)
 				go workerControl(dir)
@@ -263,8 +262,6 @@ func main() {
 		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file> <hostUser> <remoteUser>\n")
 		os.Exit(1)
 	}
-	requestChan = make(chan PrimesImpl, 1000)
-	IPWORKERS = make(chan string)
 	//Ip y pueto del worker
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
