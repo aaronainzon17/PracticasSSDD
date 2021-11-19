@@ -39,16 +39,14 @@ type PrimesImpl struct {
 var requestChan = make(chan PrimesImpl, 100) //canal para los trabajos
 var IPWORKERS = make(chan string)            //canal para que workermanager envíe ips de workers
 
-type Elastic struct {
-	MAXWORKERS  int      // Numero maximo de workers del sistema
-	MINWORKERS  int      //Numero minimo de workers del sistema
-	NWORKERSUP  int      // Numero de workers activos
-	WORKERS     []string //Ips de los workers
-	IPWORKERSUP []string
-	DELAYED     int
-	CRASHED     int
-	REQUESTS    int
-}
+var MAXWORKERS int   // Numero maximo de workers del sistema
+var MINWORKERS int   //Numero minimo de workers del sistema
+var NWORKERSUP int   // Numero de workers activos
+var WORKERS []string //Ips de los workers
+var IPWORKERSUP []string
+var DELAYED int
+var CRASHED int
+var REQUESTS int
 
 func checkError(err error) {
 	if err != nil {
@@ -87,7 +85,7 @@ func difference(slice1 []string, slice2 []string) []string {
 }
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
-	//el.REQUESTS++
+	REQUESTS++
 	res := make(chan Reply, 1)
 	requestChan <- PrimesImpl{interval, res}
 	result := <-res
@@ -102,66 +100,66 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	return nil
 }
 
-func (el *Elastic) resourceManager(hostUser string, remoteUser string) {
+func resourceManager(hostUser string, remoteUser string) {
 	start := time.Now()
 	for {
 		time.Sleep(10 * time.Second)
-		fmt.Println("Número de peticiones: " + strconv.Itoa(el.REQUESTS))
-		fmt.Println("Número de workers: " + strconv.Itoa(el.NWORKERSUP))
-		fmt.Println("Numero de delay/omission: " + strconv.Itoa(el.DELAYED))
-		fmt.Println("Numero de crash: " + strconv.Itoa(el.CRASHED))
+		fmt.Println("Número de peticiones: " + strconv.Itoa(REQUESTS))
+		fmt.Println("Número de workers: " + strconv.Itoa(NWORKERSUP))
+		fmt.Println("Numero de delay/omission: " + strconv.Itoa(DELAYED))
+		fmt.Println("Numero de crash: " + strconv.Itoa(CRASHED))
 		fmt.Println(time.Since(start))
-		el.REQUESTS = 0
+		REQUESTS = 0
 		nEnqueuedReq := len(requestChan)
 		fmt.Println("Numero de peticiones en la cola: " + strconv.Itoa(nEnqueuedReq))
 		// Si el numero de peticiones en el canal es 0 se elimina un worker, ya que se considera
 		// que el numero de peticiones restantes por atender se pueden atender garantizando el QoS
 		// con un worker menos
 		if nEnqueuedReq <= 0 {
-			if el.NWORKERSUP > el.MINWORKERS {
-				workerDir := el.IPWORKERSUP[len(el.IPWORKERSUP)-1]      //Lee el ultimo elemento del slice
-				el.IPWORKERSUP = el.IPWORKERSUP[:len(el.IPWORKERSUP)-1] //Elimina el ultimo elemento del slice
+			if NWORKERSUP > MINWORKERS {
+				workerDir := IPWORKERSUP[len(IPWORKERSUP)-1]   //Lee el ultimo elemento del slice
+				IPWORKERSUP = IPWORKERSUP[:len(IPWORKERSUP)-1] //Elimina el ultimo elemento del slice
 
 				workerConn, err := rpc.DialHTTP("tcp", workerDir)
 				if err == nil {
 					var res int
 					workerConn.Go("PrimesImpl.Stop", 1, &res, nil)
 				}
-				el.NWORKERSUP--
+				NWORKERSUP--
 			}
 			// Si hay peticiones en el canal se entiende que el numero de workers activos no son suficientes
 			// para sartisfacer la demanda por lo que se levanta un worker mas
 		} else {
-			fmt.Println("MAXWORKERS: ", el.MAXWORKERS) // Numero maximo de workers del sistema
-			availableDirs := difference(el.WORKERS, el.IPWORKERSUP)
+			fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
+			availableDirs := difference(WORKERS, IPWORKERSUP)
 			fmt.Println("DIRECCIONES DISPONIBLES:")
 			fmt.Println(availableDirs)
 			dir := availableDirs[len(availableDirs)-1]
 			fmt.Println("Se lanza un worker en: ", dir)
-			if el.NWORKERSUP < el.MAXWORKERS {
+			if NWORKERSUP < MAXWORKERS {
 
 				go sshWorkerUp(dir, hostUser, remoteUser)
 				time.Sleep(5000 * time.Millisecond)
-				go el.workerControl(dir)
-				el.NWORKERSUP++                              // Se anyade un worker mas al contador
-				el.IPWORKERSUP = append(el.IPWORKERSUP, dir) //Se anyade la ip del worker a la lista de workers up
+				go workerControl(dir)
+				NWORKERSUP++                           // Se anyade un worker mas al contador
+				IPWORKERSUP = append(IPWORKERSUP, dir) //Se anyade la ip del worker a la lista de workers up
 			}
 		}
 	}
 }
 
 //Si te caes te levantas
-func (el *Elastic) workerManager(hostUser string, remoteUser string) {
+func workerManager(hostUser string, remoteUser string) {
 	for {
 		workerIp := <-IPWORKERS
 		go sshWorkerUp(workerIp, hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
-		go el.workerControl(workerIp)
+		go workerControl(workerIp)
 		fmt.Println("Reconnecting to", workerIp)
 	}
 }
 
-func (el *Elastic) workerControl(workerIp string) {
+func workerControl(workerIp string) {
 	var reply []int
 	fin := false
 	w := strings.Split(workerIp, ".")
@@ -169,7 +167,7 @@ func (el *Elastic) workerControl(workerIp string) {
 		select {
 		// Recibe un tabajo del canal
 		case job := <-requestChan:
-			el.REQUESTS++
+			REQUESTS++
 			// Se establece una conexion TCP con el worker
 			workerCon, err := rpc.DialHTTP("tcp", workerIp)
 			if err == nil { // Si no hay error
@@ -183,14 +181,14 @@ func (el *Elastic) workerControl(workerIp string) {
 						job.ReplyChan <- Reply{reply, nil, w[len(w)-1]}
 					} else {
 						//Se guarda fallo
-						el.CRASHED++
+						CRASHED++
 						job.ReplyChan <- Reply{reply, fmt.Errorf("Crash"), w[len(w)-1]}
 						//Se mete la direccion del worker caido al canal para que el worker manager lo intente levantar
 						IPWORKERS <- workerIp
 						fin = true
 					}
 				case <-time.After(3 * time.Second):
-					el.DELAYED++
+					DELAYED++
 					//Caso en el que salta la alarma programada por el time.After
 					fmt.Println("Fallo por DELAY/OMISION")
 					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision"), w[len(w)-1]}
@@ -271,39 +269,38 @@ func main() {
 	//Ip y pueto del worker
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
-	el := new(Elastic)
-	el.MINWORKERS = 2
-	el.DELAYED = 0
-	el.CRASHED = 0
-	el.REQUESTS = 0
-	el.WORKERS, el.MAXWORKERS = readFile(os.Args[2])
+	MINWORKERS = 2
+	DELAYED = 0
+	CRASHED = 0
+	REQUESTS = 0
+	WORKERS, MAXWORKERS = readFile(os.Args[2])
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
-	for i := 0; i < el.MINWORKERS; i++ {
-		fmt.Println("connecting to", el.WORKERS[i])
-		go sshWorkerUp(el.WORKERS[i], hostUser, remoteUser)
+	for i := 0; i < MINWORKERS; i++ {
+		fmt.Println("connecting to", WORKERS[i])
+		go sshWorkerUp(WORKERS[i], hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
-		go el.workerControl(el.WORKERS[i])
+		go workerControl(WORKERS[i])
 
-		el.NWORKERSUP++
-		el.IPWORKERSUP = append(el.IPWORKERSUP, el.WORKERS[i])
+		NWORKERSUP++
+		IPWORKERSUP = append(IPWORKERSUP, WORKERS[i])
 	}
 
-	go el.workerManager(hostUser, remoteUser)
-	go el.resourceManager(hostUser, remoteUser)
+	go workerManager(hostUser, remoteUser)
+	go resourceManager(hostUser, remoteUser)
 
 	fmt.Println("DATA")
 	fmt.Println("------------------------------------------")
-	fmt.Println("MAXWORKERS: ", el.MAXWORKERS) // Numero maximo de workers del sistema
-	fmt.Println("MINWORKERS: ", el.MINWORKERS) //Numero minimo de workers del sistema
-	fmt.Println("WORKERS: ", el.WORKERS)       //Ips de los workers
-	fmt.Println("NWORKERSUP: ", el.NWORKERSUP) // Numero de workers activos
-	fmt.Println("IPWORKERSUP", el.IPWORKERSUP) //Ips de los workers levantados
+	fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
+	fmt.Println("MINWORKERS: ", MINWORKERS) //Numero minimo de workers del sistema
+	fmt.Println("WORKERS: ", WORKERS)       //Ips de los workers
+	fmt.Println("NWORKERSUP: ", NWORKERSUP) // Numero de workers activos
+	fmt.Println("IPWORKERSUP", IPWORKERSUP) //Ips de los workers levantados
 	fmt.Println("------------------------------------------")
 	fmt.Println("SERVING ...")
 
-	a := difference(el.WORKERS, el.IPWORKERSUP)
+	a := difference(WORKERS, IPWORKERSUP)
 	fmt.Println("Available dirs: ")
 	fmt.Println(a)
 
