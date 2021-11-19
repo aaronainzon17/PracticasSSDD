@@ -53,6 +53,8 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	result := <-res
 	if result.err != nil {
 		fmt.Println("Tarea fallida: ", result.err)
+		//Se envia que la tarea ha fallado y se vuelve a encolar
+		//requestChan <- PrimesImpl{interval, res}
 		return result.err
 	}
 	fmt.Println("Tarea completada: ", interval)
