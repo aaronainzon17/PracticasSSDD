@@ -36,11 +36,11 @@ type PrimesImpl struct {
 	ReplyChan chan Reply
 }
 
-var requestChan = make(chan PrimesImpl, 100) //canal para los trabajos
-var IPWORKERS = make(chan string)            //canal para que workermanager envíe ips de workers
-var MAXWORKERS = 0                           // Numero maximo de workers del sistema
-var MINWORKERS = 2                           //Numero minimo de workers del sistema
-var WORKERS []string                         //Ips de los workers
+var requestChan = make(chan PrimesImpl) //canal para los trabajos
+var IPWORKERS = make(chan string)       //canal para que workermanager envíe ips de workers
+var MAXWORKERS = 0                      // Numero maximo de workers del sistema
+var MINWORKERS = 2                      //Numero minimo de workers del sistema
+var WORKERS []string                    //Ips de los workers
 
 var NWORKERSUP = 0 // Numero de workers activos
 var IPWORKERSUP []string
