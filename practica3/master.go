@@ -17,6 +17,7 @@ import (
 	"net/rpc"
 	"os"
 	"practica3/com"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,6 +56,21 @@ func checkError(err error) {
 	}
 }
 
+//Devuelve las direcciones disponibles para lanzar un worker
+func getAvailableDirs() []string {
+	mb := make(map[string]struct{}, len(WORKERS))
+	for _, x := range WORKERS {
+		mb[x] = struct{}{}
+	}
+	var diff []string
+	for _, x := range IPWORKERSUP {
+		if _, found := mb[x]; !found {
+			diff = append(diff, x)
+		}
+	}
+	return diff
+}
+
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
 	res := make(chan Reply, 1)
 	requestChan <- PrimesImpl{interval, res}
@@ -68,6 +84,61 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	fmt.Println("Tarea completada: ", interval, " por ", result.worker)
 	*primeList = result.primes
 	return nil
+}
+
+func resourceManager(hostUser string, remoteUser string) {
+	start := time.Now()
+	for {
+		time.Sleep(10 * time.Second)
+		fmt.Println("Número de peticiones: " + strconv.Itoa(REQUESTS))
+		fmt.Println("Número de workers: " + strconv.Itoa(NWORKERSUP))
+		fmt.Println("Numero de delay/omission: " + strconv.Itoa(DELAYED))
+		fmt.Println("Numero de crash: " + strconv.Itoa(CRASHED))
+		fmt.Println(time.Since(start))
+		REQUESTS = 0
+		nEnqueuedReq := len(requestChan)
+		// Si el numero de peticiones en el canal es 0 se elimina un worker, ya que se considera
+		// que el numero de peticiones restantes por atender se pueden atender garantizando el QoS
+		// con un worker menos
+		if nEnqueuedReq == 0 {
+			if NWORKERSUP > MINWORKERS {
+				workerDir := IPWORKERSUP[len(IPWORKERSUP)-1]   //Lee el ultimo elemento del slice
+				IPWORKERSUP = IPWORKERSUP[:len(IPWORKERSUP)-1] //Elimina el ultimo elemento del slice
+
+				workerConn, err := rpc.DialHTTP("tcp", workerDir)
+				if err == nil {
+					var res int
+					workerConn.Go("PrimesImpl.Stop", 1, &res, nil)
+				}
+				NWORKERSUP--
+			}
+			// Si hay peticiones en el canal se entiende que el numero de workers activos no son suficientes
+			// para sartisfacer la demanda por lo que se levanta un worker mas
+		} else {
+			if NWORKERSUP != MAXWORKERS {
+
+				availableDirs := getAvailableDirs()
+				dir := availableDirs[len(availableDirs)-1]
+
+				go sshWorkerUp(dir, hostUser, remoteUser)
+				time.Sleep(5000 * time.Millisecond)
+				go workerControl(dir)
+				NWORKERSUP++                           // Se anyade un worker mas al contador
+				IPWORKERSUP = append(IPWORKERSUP, dir) //Se anyade la ip del worker a la lista de workers up
+			}
+		}
+	}
+}
+
+//Si te caes te levantas
+func workerManager(hostUser string, remoteUser string) {
+	for {
+		workerIp := <-IPWORKERS
+		go sshWorkerUp(workerIp, hostUser, remoteUser)
+		time.Sleep(5000 * time.Millisecond)
+		go workerControl(workerIp)
+		fmt.Println("Reconnecting to", workerIp)
+	}
 }
 
 func workerControl(workerIp string) {
@@ -90,13 +161,15 @@ func workerControl(workerIp string) {
 					if rep.Error == nil {
 						job.ReplyChan <- Reply{reply, nil, w[len(w)-1]}
 					} else {
-						fmt.Println("Fallo por CRASH")
 						//Se guarda fallo
+						CRASHED++
 						job.ReplyChan <- Reply{reply, fmt.Errorf("Crash"), w[len(w)-1]}
-						fmt.Println("Goroutine exiting on worker ")
+						//Se mete la direccion del worker caido al canal para que el worker manager lo intente levantar
+						IPWORKERS <- workerIp
 						fin = true
 					}
 				case <-time.After(3 * time.Second):
+					DELAYED++
 					//Caso en el que salta la alarma programada por el time.After
 					fmt.Println("Fallo por DELAY/OMISION")
 					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision"), w[len(w)-1]}
@@ -191,6 +264,8 @@ func main() {
 		IPWORKERSUP = append(IPWORKERSUP, WORKERS[i])
 	}
 
+	go workerManager(hostUser, remoteUser)
+
 	fmt.Println("DATA")
 	fmt.Println("------------------------------------------")
 	fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
@@ -200,6 +275,10 @@ func main() {
 	fmt.Println("IPWORKERSUP", IPWORKERSUP) //Ips de los workers levantados
 	fmt.Println("------------------------------------------")
 	fmt.Println("SERVING ...")
+
+	a := getAvailableDirs()
+	fmt.Println("Available dirs: ")
+	fmt.Println(a)
 
 	primesImpl := new(PrimesImpl)
 	rpc.Register(primesImpl)
