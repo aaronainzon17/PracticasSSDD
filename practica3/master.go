@@ -36,6 +36,17 @@ type PrimesImpl struct {
 }
 
 var requestChan = make(chan PrimesImpl, 100) //canal para los trabajos
+var IPWORKERS = make(chan string)            //canal para que workermanager envíe ips de workers
+var MAXWORKERS = 0                           // Numero maximo de workers del sistema
+var MINWORKERS = 2                           //Numero minimo de workers del sistema
+var WORKERS []string                         //Ips de los workers
+
+var NWORKERSUP = 0 // Numero de workers activos
+var IPWORKERSUP []string
+
+var DELAYED = 0
+var CRASHED = 0
+var REQUESTS = 0
 
 func checkError(err error) {
 	if err != nil {
@@ -97,28 +108,29 @@ func workerControl(workerIp string) {
 	}
 }
 
-func readFile(path string) []string {
+func readFile(path string) ([]string, int) {
 	fmt.Println("entra a leer el fichero ", path)
 
 	f, err := os.Open(path)
 	checkError(err)
-
+	nWorkers := 0
 	var workers []string
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		workers = append(workers, scanner.Text())
+		nWorkers++
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
 
 	f.Close()
-	return workers
+	return workers, nWorkers
 }
 
 func runCmd(cmd string, client string, s *ssh.ClientConfig) error {
 	// open connection
-	fmt.Println("Client: ", client)
+	//fmt.Println("Client: ", client)
 	conn, err := ssh.Dial("tcp", client+":22", s)
 	checkError(err)
 	defer conn.Close()
@@ -165,16 +177,28 @@ func main() {
 	//Ip y pueto del worker
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
-	workers := readFile(os.Args[2])
+	WORKERS, MAXWORKERS := readFile(os.Args[2])
 	hostUser := os.Args[3]
 	remoteUser := os.Args[4]
 
-	for i := range workers {
-		go sshWorkerUp(workers[i], hostUser, remoteUser)
+	for i := 0; i < MINWORKERS; i++ {
+		fmt.Println("connecting to", WORKERS[i])
+		go sshWorkerUp(WORKERS[i], hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
-		go workerControl(workers[i])
-		fmt.Println("connecting to", workers[i])
+		go workerControl(WORKERS[i])
+
+		NWORKERSUP++
+		IPWORKERSUP = append(IPWORKERSUP, WORKERS[i])
 	}
+
+	fmt.Println("DATA")
+	fmt.Println("------------------------------------------")
+	fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
+	fmt.Println("MINWORKERS: ", MINWORKERS) //Numero minimo de workers del sistema
+	fmt.Println("WORKERS: ", WORKERS)       //Ips de los workers
+	fmt.Println("NWORKERSUP: ", NWORKERSUP) // Numero de workers activos
+	fmt.Println("IPWORKERSUP", IPWORKERSUP) //Ips de los workers levantados
+	fmt.Println("------------------------------------------")
 	fmt.Println("SERVING ...")
 
 	primesImpl := new(PrimesImpl)
