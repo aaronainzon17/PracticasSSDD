@@ -30,6 +30,7 @@ import (
 type Reply struct {
 	primes []int
 	err    error
+	worker string
 }
 
 type PrimesImpl struct {
@@ -52,12 +53,12 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	requestChan <- PrimesImpl{interval, res}
 	result := <-res
 	if result.err != nil {
-		fmt.Println("Tarea fallida: ", result.err)
+		fmt.Println("Tarea fallida: ", result.err, " por ", result.worker)
 		//Se envia que la tarea ha fallado y se vuelve a encolar
 		requestChan <- PrimesImpl{interval, res}
 		return result.err
 	}
-	fmt.Println("Tarea completada: ", interval)
+	fmt.Println("Tarea completada: ", interval, " por ", result.worker)
 	*primeList = result.primes
 	return nil
 }
@@ -65,6 +66,7 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 func workerControl(workerIp string) {
 	var reply []int
 	fin := false
+	w := strings.Split(workerIp, ".")
 	for !fin {
 		select {
 		// Recibe un tabajo del canal
@@ -79,16 +81,16 @@ func workerControl(workerIp string) {
 				case rep := <-divCall.Done:
 					//Si no hay error se guarda la respuesta en el tipo Reply
 					if rep.Error == nil {
-						job.ReplyChan <- Reply{primes: reply, err: nil}
+						job.ReplyChan <- Reply{reply, nil, w[len(w)-1]}
 					} else {
 						//Se guarda fallo
-						job.ReplyChan <- Reply{reply, fmt.Errorf("Crash")}
+						job.ReplyChan <- Reply{reply, fmt.Errorf("Crash"), w[len(w)-1]}
 						fmt.Println("Goroutine exiting on worker ")
 						fin = true
 					}
 				case <-time.After(3 * time.Second):
 					//Caso en el que salta la alarma programada por el time.After
-					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision")}
+					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision"), w[len(w)-1]}
 				}
 			} else {
 				fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
