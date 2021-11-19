@@ -131,10 +131,14 @@ func resourceManager(hostUser string, remoteUser string) {
 			// Si hay peticiones en el canal se entiende que el numero de workers activos no son suficientes
 			// para sartisfacer la demanda por lo que se levanta un worker mas
 		} else {
+			fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
+			availableDirs := difference(WORKERS, IPWORKERSUP)
+			fmt.Println("DIRECCIONES DISPONIBLES:")
+			fmt.Println(availableDirs)
+			dir := availableDirs[len(availableDirs)-1]
+			fmt.Println("Se lanza un worker en: ", dir)
 			if NWORKERSUP < MAXWORKERS {
-				availableDirs := difference(WORKERS, IPWORKERSUP)
-				dir := availableDirs[len(availableDirs)-1]
-				fmt.Println("Se lanza un worker en: ", dir)
+
 				go sshWorkerUp(dir, hostUser, remoteUser)
 				time.Sleep(5000 * time.Millisecond)
 				go workerControl(dir)
