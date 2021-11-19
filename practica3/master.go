@@ -290,7 +290,7 @@ func main() {
 	go workerManager(hostUser, remoteUser)
 	go resourceManager(hostUser, remoteUser)
 
-	fmt.Println("DATA")
+	fmt.Println("DATA: ")
 	fmt.Println("------------------------------------------")
 	fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
 	fmt.Println("MINWORKERS: ", MINWORKERS) //Numero minimo de workers del sistema
