@@ -57,24 +57,32 @@ func checkError(err error) {
 }
 
 //Devuelve las direcciones disponibles para lanzar un worker
-func getAvailableDirs() []string {
-	diffStr := []string{}
-	m := map[string]int{}
+func difference(slice1 []string, slice2 []string) []string {
+	var diff []string
 
-	for _, s1Val := range WORKERS {
-		m[s1Val] = 1
-	}
-	for _, s2Val := range IPWORKERSUP {
-		m[s2Val] = m[s2Val] + 1
-	}
-
-	for mKey, mVal := range m {
-		if mVal == 1 {
-			diffStr = append(diffStr, mKey)
+	// Loop two times, first to find slice1 strings not in slice2,
+	// second loop to find slice2 strings not in slice1
+	for i := 0; i < 2; i++ {
+		for _, s1 := range slice1 {
+			found := false
+			for _, s2 := range slice2 {
+				if s1 == s2 {
+					found = true
+					break
+				}
+			}
+			// String not found. We add it to return slice
+			if !found {
+				diff = append(diff, s1)
+			}
+		}
+		// Swap the slices, only if it was the first loop
+		if i == 0 {
+			slice1, slice2 = slice2, slice1
 		}
 	}
 
-	return diffStr
+	return diff
 }
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
@@ -123,7 +131,7 @@ func resourceManager(hostUser string, remoteUser string) {
 		} else {
 			if NWORKERSUP != MAXWORKERS {
 
-				availableDirs := getAvailableDirs()
+				availableDirs := difference(WORKERS, IPWORKERSUP)
 				dir := availableDirs[len(availableDirs)-1]
 
 				go sshWorkerUp(dir, hostUser, remoteUser)
@@ -282,7 +290,7 @@ func main() {
 	fmt.Println("------------------------------------------")
 	fmt.Println("SERVING ...")
 
-	a := getAvailableDirs()
+	a := difference(WORKERS, IPWORKERSUP)
 	fmt.Println("Available dirs: ")
 	fmt.Println(a)
 
