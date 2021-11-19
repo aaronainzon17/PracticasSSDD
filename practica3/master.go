@@ -129,7 +129,7 @@ func resourceManager(hostUser string, remoteUser string) {
 			// Si hay peticiones en el canal se entiende que el numero de workers activos no son suficientes
 			// para sartisfacer la demanda por lo que se levanta un worker mas
 		} else {
-			if NWORKERSUP != MAXWORKERS {
+			if NWORKERSUP < MAXWORKERS {
 
 				availableDirs := difference(WORKERS, IPWORKERSUP)
 				dir := availableDirs[len(availableDirs)-1]
@@ -279,6 +279,7 @@ func main() {
 	}
 
 	go workerManager(hostUser, remoteUser)
+	go resourceManager(hostUser, remoteUser)
 
 	fmt.Println("DATA")
 	fmt.Println("------------------------------------------")
