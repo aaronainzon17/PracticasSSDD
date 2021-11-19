@@ -86,6 +86,7 @@ func difference(slice1 []string, slice2 []string) []string {
 }
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
+	REQUESTS++
 	res := make(chan Reply, 1)
 	requestChan <- PrimesImpl{interval, res}
 	result := <-res
@@ -111,6 +112,7 @@ func resourceManager(hostUser string, remoteUser string) {
 		fmt.Println(time.Since(start))
 		REQUESTS = 0
 		nEnqueuedReq := len(requestChan)
+		fmt.Println("Numero de peticiones en la cola: " + strconv.Itoa(nEnqueuedReq))
 		// Si el numero de peticiones en el canal es 0 se elimina un worker, ya que se considera
 		// que el numero de peticiones restantes por atender se pueden atender garantizando el QoS
 		// con un worker menos
