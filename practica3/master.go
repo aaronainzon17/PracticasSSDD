@@ -58,18 +58,23 @@ func checkError(err error) {
 
 //Devuelve las direcciones disponibles para lanzar un worker
 func getAvailableDirs() []string {
-	// difference returns the elements in (a)`WORKERS` that aren't in (b)`IPWORKERSUP`.
-	mb := make(map[string]struct{}, len(IPWORKERSUP))
-	for _, x := range IPWORKERSUP {
-		mb[x] = struct{}{}
+	diffStr := []string{}
+	m := map[string]int{}
+
+	for _, s1Val := range WORKERS {
+		m[s1Val] = 1
 	}
-	var diff []string
-	for _, x := range WORKERS {
-		if _, found := mb[x]; !found {
-			diff = append(diff, x)
+	for _, s2Val := range IPWORKERSUP {
+		m[s2Val] = m[s2Val] + 1
+	}
+
+	for mKey, mVal := range m {
+		if mVal == 1 {
+			diffStr = append(diffStr, mKey)
 		}
 	}
-	return diff
+
+	return diffStr
 }
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
