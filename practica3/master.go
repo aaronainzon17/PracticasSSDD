@@ -87,7 +87,7 @@ func difference(slice1 []string, slice2 []string) []string {
 }
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
-	el.REQUESTS++
+	//el.REQUESTS++
 	res := make(chan Reply, 1)
 	requestChan <- PrimesImpl{interval, res}
 	result := <-res
@@ -151,12 +151,12 @@ func (el *Elastic) resourceManager(hostUser string, remoteUser string) {
 }
 
 //Si te caes te levantas
-func workerManager(hostUser string, remoteUser string) {
+func (el *Elastic) workerManager(hostUser string, remoteUser string) {
 	for {
 		workerIp := <-IPWORKERS
 		go sshWorkerUp(workerIp, hostUser, remoteUser)
 		time.Sleep(5000 * time.Millisecond)
-		go workerControl(workerIp)
+		go el.workerControl(workerIp)
 		fmt.Println("Reconnecting to", workerIp)
 	}
 }
@@ -169,6 +169,7 @@ func (el *Elastic) workerControl(workerIp string) {
 		select {
 		// Recibe un tabajo del canal
 		case job := <-requestChan:
+			el.REQUESTS++
 			// Se establece una conexion TCP con el worker
 			workerCon, err := rpc.DialHTTP("tcp", workerIp)
 			if err == nil { // Si no hay error
@@ -289,7 +290,7 @@ func main() {
 		el.IPWORKERSUP = append(el.IPWORKERSUP, el.WORKERS[i])
 	}
 
-	go workerManager(hostUser, remoteUser)
+	go el.workerManager(hostUser, remoteUser)
 	go el.resourceManager(hostUser, remoteUser)
 
 	fmt.Println("DATA")
