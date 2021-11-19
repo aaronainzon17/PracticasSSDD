@@ -67,7 +67,7 @@ func findPrimes(interval com.TPInterval) (primes []int) {
 // POST: FindPrimes devuelve todos los números primos comprendidos en el
 // 		intervalo [interval.A, interval.B]
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
-	/*p.mutex.Lock()
+	p.mutex.Lock()
 	if p.i%p.behaviourPeriod == 0 {
 		p.behaviourPeriod = rand.Intn(20-2) + 2
 		options := rand.Intn(100)
@@ -103,8 +103,7 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 		*primeList = findPrimes(interval)
 	default:
 		*primeList = findPrimes(interval)
-	}*/
-	*primeList = findPrimes(interval)
+	}
 	return nil
 }
 
