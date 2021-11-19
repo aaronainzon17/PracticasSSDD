@@ -58,13 +58,13 @@ func checkError(err error) {
 
 //Devuelve las direcciones disponibles para lanzar un worker
 func getAvailableDirs() []string {
-	// difference returns the elements in `a` that aren't in `b`.
-	mb := make(map[string]struct{}, len(WORKERS))
-	for _, x := range WORKERS {
+	// difference returns the elements in (a)`WORKERS` that aren't in (b)`IPWORKERSUP`.
+	mb := make(map[string]struct{}, len(IPWORKERSUP))
+	for _, x := range IPWORKERSUP {
 		mb[x] = struct{}{}
 	}
 	var diff []string
-	for _, x := range IPWORKERSUP {
+	for _, x := range WORKERS {
 		if _, found := mb[x]; !found {
 			diff = append(diff, x)
 		}
