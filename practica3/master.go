@@ -36,11 +36,11 @@ type PrimesImpl struct {
 	ReplyChan chan Reply
 }
 
-var requestChan chan PrimesImpl   //canal para los trabajos
-var IPWORKERS = make(chan string) //canal para que workermanager envíe ips de workers
-var MAXWORKERS = 0                // Numero maximo de workers del sistema
-var MINWORKERS = 2                //Numero minimo de workers del sistema
-var WORKERS []string              //Ips de los workers
+var requestChan chan PrimesImpl //canal para los trabajos
+var IPWORKERS chan string       //canal para que workermanager envíe ips de workers
+var MAXWORKERS = 0              // Numero maximo de workers del sistema
+var MINWORKERS = 2              //Numero minimo de workers del sistema
+var WORKERS []string            //Ips de los workers
 
 var NWORKERSUP = 0 // Numero de workers activos
 var IPWORKERSUP []string
@@ -263,6 +263,8 @@ func main() {
 		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file> <hostUser> <remoteUser>\n")
 		os.Exit(1)
 	}
+	requestChan = make(chan PrimesImpl, 1000)
+	IPWORKERS = make(chan string)
 	//Ip y pueto del worker
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
