@@ -23,10 +23,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-/*type Master struct {
-	//mutex sync.Mutex
-}*/
-
 type Reply struct {
 	primes []int
 	err    error
