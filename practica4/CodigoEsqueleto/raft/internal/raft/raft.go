@@ -63,11 +63,24 @@ type NodoRaft struct {
 	// Utilización opcional de este logger para depuración
 	// Cada nodo Raft tiene su propio registro de trazas (logs)
 	logger *log.Logger
-
-
-	// Vuestros datos aqui.
 	
+	// Vuestros datos aqui.
+	State
 	// mirar figura 2 para descripción del estado que debe mantenre un nodo Raft
+}
+
+type State struct {
+	CurrentTerm int //Mandato actual
+	VotedFor int //Candidato que ha recibido el voto en el mandto actual
+	log []string
+	//For all servers 
+	CommitIndex int //	Índice de la última entrada cometida
+	LastApplied int //	última entrada del log aplicada en la máquina de estados
+
+	//Only for leaders 
+	NextIndex int 
+	MatchIndex int 
+	
 }
 
 
@@ -184,7 +197,10 @@ func (nr *NodoRaft) SometerOperacion(operacion interface{}) (int, int, bool) {
 // Nombres de campos deben comenzar con letra mayuscula !
 //
 type ArgsPeticionVoto struct {
-	// Vuestros datos aqui
+	Term int
+	CandidateId int	
+	LastLogIndex int
+	LastLogTerm int 
 }
 
 //
@@ -199,7 +215,8 @@ type ArgsPeticionVoto struct {
 //
 //
 type RespuestaPeticionVoto struct {
-	// Vuestros datos aqui
+	Term int
+	VoteGranted bool
 }
 
 //
@@ -210,6 +227,14 @@ type RespuestaPeticionVoto struct {
 //
 func (nr *NodoRaft) PedirVoto(args *ArgsPeticionVoto, reply *RespuestaPeticionVoto) {
 	// Vuestro codigo aqui
+	if args.Term < nr.CurrentTerm {
+		reply.VoteGranted = false
+	}else if (nr.VotedFor == nil | nr.VotedFor == args.CandidateId) &
+											(args.LastLogIndex >= len(nr.State.log)) {
+		reply.VoteGranted = true
+	}else {
+		reply.VoteGranted = false
+	}
 }
 
 
@@ -249,3 +274,27 @@ func (nr *NodoRaft) enviarPeticionVoto(nodo int, args *RequestVoteArgs,
 	return ok
 }
 
+type ArgsAppendEntries struct {
+	Term int
+	LeaderId int	
+	PrevLogIndex int
+	PrevLogTerm int 
+	Entries []string //log.Logger
+	LeaderCommit int
+}
+
+type RespuestaAppendEntries struct {
+	Term int
+	Success bool
+}
+
+func (nr *NodoRaft) enviarLatido(args *ArgsAppendEntries,
+											reply *RespuestaAppendEntries) {
+	if args.Term < nr.CurrentTerm {
+		reply.VoteGranted = false
+	} else if (args.PrevLogTerm  != args.Entries[args.PrevLogIndex]) {
+		
+	} else {
+
+	}
+}
