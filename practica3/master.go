@@ -9,6 +9,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -100,7 +101,7 @@ func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error
 	return nil
 }
 
-func resourceManager(hostUser string, remoteUser string) {
+func resourceManager(hostUser string, remoteUser string, f *os.File) {
 	start := time.Now()
 	for {
 		time.Sleep(10 * time.Second)
@@ -109,9 +110,13 @@ func resourceManager(hostUser string, remoteUser string) {
 		fmt.Println("Numero de delay/omission: " + strconv.Itoa(DELAYED))
 		fmt.Println("Numero de crash: " + strconv.Itoa(CRASHED))
 		fmt.Println(time.Since(start))
-		REQUESTS = 0
 		nEnqueuedReq := len(requestChan)
 		fmt.Println("Numero de peticiones en la cola: " + strconv.Itoa(nEnqueuedReq))
+		_, err := f.WriteString(string(int(time.Since(start))) + ";" + strconv.Itoa(NWORKERSUP) + ";" +
+			"NUMERO DE CLIENTES" + ";" + strconv.Itoa(REQUESTS) + ";" + strconv.Itoa(nEnqueuedReq) + ";" + "\n")
+		checkError(err)
+		REQUESTS = 0
+
 		// Si el numero de peticiones en el canal es 0 se elimina un worker, ya que se considera
 		// que el numero de peticiones restantes por atender se pueden atender garantizando el QoS
 		// con un worker menos
@@ -182,7 +187,7 @@ func workerControl(workerIp string) {
 					} else {
 						//Se guarda fallo
 						CRASHED++
-						job.ReplyChan <- Reply{reply, fmt.Errorf("Crash"), w[len(w)-1]}
+						job.ReplyChan <- Reply{reply, errors.New("CRASH"), w[len(w)-1]}
 						//Se mete la direccion del worker caido al canal para que el worker manager lo intente levantar
 						IPWORKERS <- workerIp
 						fin = true
@@ -191,7 +196,7 @@ func workerControl(workerIp string) {
 					DELAYED++
 					//Caso en el que salta la alarma programada por el time.After
 					fmt.Println("Fallo por DELAY/OMISION")
-					job.ReplyChan <- Reply{reply, fmt.Errorf("Worker fail: delay/omision"), w[len(w)-1]}
+					job.ReplyChan <- Reply{reply, errors.New("DELAY/OMISION"), w[len(w)-1]}
 				}
 			} else {
 				fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
@@ -287,8 +292,11 @@ func main() {
 		IPWORKERSUP = append(IPWORKERSUP, WORKERS[i])
 	}
 
+	f, err := os.Create("data.csv")
+	checkError(err)
+
 	go workerManager(hostUser, remoteUser)
-	go resourceManager(hostUser, remoteUser)
+	go resourceManager(hostUser, remoteUser, f)
 
 	fmt.Println("DATA: ")
 	fmt.Println("------------------------------------------")
