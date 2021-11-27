@@ -9,7 +9,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -37,8 +36,8 @@ type PrimesImpl struct {
 	ReplyChan chan Reply
 }
 
-var requestChan = make(chan PrimesImpl, 100) //canal para los trabajos
-var IPWORKERS = make(chan string)            //canal para que workermanager envíe ips de workers
+var requestChan chan PrimesImpl   //canal para los trabajos
+var IPWORKERS = make(chan string) //canal para que workermanager envíe ips de workers
 
 var MAXWORKERS int   // Numero maximo de workers del sistema
 var MINWORKERS int   //Numero minimo de workers del sistema
@@ -87,17 +86,21 @@ func difference(slice1 []string, slice2 []string) []string {
 
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
 	REQUESTS++
+	procesada := false
 	res := make(chan Reply, 1)
 	requestChan <- PrimesImpl{interval, res}
-	result := <-res
-	if result.err != nil {
-		fmt.Println("Tarea fallida: ", result.err, " por ", result.worker)
-		//Se envia que la tarea ha fallado y se vuelve a encolar
-		requestChan <- PrimesImpl{interval, res}
-		return result.err
+	for !procesada {
+		result := <-res
+		if result.err != nil {
+			fmt.Println("Tarea fallida: ", result.err, " por ", result.worker)
+			//Se envia que la tarea ha fallado y se vuelve a encolar
+			requestChan <- PrimesImpl{interval, res}
+		} else {
+			fmt.Println("Tarea completada: ", interval, " por ", result.worker)
+			*primeList = result.primes
+			procesada = true
+		}
 	}
-	fmt.Println("Tarea completada: ", interval, " por ", result.worker)
-	*primeList = result.primes
 	return nil
 }
 
@@ -135,14 +138,14 @@ func resourceManager(hostUser string, remoteUser string, f *os.File) {
 			// Si hay peticiones en el canal se entiende que el numero de workers activos no son suficientes
 			// para sartisfacer la demanda por lo que se levanta un worker mas
 		} else {
-			fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
-			availableDirs := difference(WORKERS, IPWORKERSUP)
-			fmt.Println("DIRECCIONES DISPONIBLES:")
-			fmt.Println(availableDirs)
-			dir := availableDirs[len(availableDirs)-1]
-			fmt.Println("Se lanza un worker en: ", dir)
-			if NWORKERSUP < MAXWORKERS {
 
+			if NWORKERSUP < MAXWORKERS {
+				fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
+				availableDirs := difference(WORKERS, IPWORKERSUP)
+				fmt.Println("DIRECCIONES DISPONIBLES:")
+				fmt.Println(availableDirs)
+				dir := availableDirs[len(availableDirs)-1]
+				fmt.Println("Se lanza un worker en: ", dir)
 				go sshWorkerUp(dir, hostUser, remoteUser)
 				time.Sleep(5000 * time.Millisecond)
 				go workerControl(dir)
@@ -162,6 +165,9 @@ func workerManager(hostUser string, remoteUser string) {
 		go workerControl(workerIp)
 		fmt.Println("Reconnecting to", workerIp)
 	}
+}
+func callWorker(workerCon *rpc.Client, interval com.TPInterval, rep *[]int, errCh chan error) {
+
 }
 
 func workerControl(workerIp string) {
@@ -187,7 +193,7 @@ func workerControl(workerIp string) {
 					} else {
 						//Se guarda fallo
 						CRASHED++
-						job.ReplyChan <- Reply{reply, errors.New("CRASH"), w[len(w)-1]}
+						job.ReplyChan <- Reply{reply, rep.Error, w[len(w)-1]}
 						//Se mete la direccion del worker caido al canal para que el worker manager lo intente levantar
 						IPWORKERS <- workerIp
 						fin = true
@@ -196,7 +202,7 @@ func workerControl(workerIp string) {
 					DELAYED++
 					//Caso en el que salta la alarma programada por el time.After
 					fmt.Println("Fallo por DELAY/OMISION")
-					job.ReplyChan <- Reply{reply, errors.New("DELAY/OMISION"), w[len(w)-1]}
+					job.ReplyChan <- Reply{reply, nil, w[len(w)-1]}
 				}
 			} else {
 				fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
@@ -260,7 +266,7 @@ func sshWorkerUp(worker string, hostUser string, remoteUser string) {
 		},
 	}
 	res1 := strings.Split(worker, ":")
-	cmd := "cd /home/a779088/cuarto/PracticasSSDD/practica3 && /usr/local/go/bin/go run worker.go " + worker + " &"
+	cmd := "cd /home/a779088/cuarto/practica3 && /usr/local/go/bin/go run worker.go " + worker + " &"
 	//fmt.Println("Comando:", cmd)
 	err = runCmd(cmd, res1[0], config)
 	checkError(err)
@@ -271,6 +277,7 @@ func main() {
 		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file> <hostUser> <remoteUser>\n")
 		os.Exit(1)
 	}
+	requestChan = make(chan PrimesImpl, 100)
 	//Ip y pueto del worker
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero

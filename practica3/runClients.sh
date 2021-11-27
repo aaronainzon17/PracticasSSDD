@@ -8,9 +8,8 @@ max=$1
 
 for i in `seq 1 $max`
 do
-    sleep 5
-    echo va
-    #go run client.go 155.210.154.210:30000 &
+    sleep 9
+    go run client.go 155.210.154.210:30000 &
 done
-
+echo "ALL CLIENTS DEPLOYED"
 exit 0
