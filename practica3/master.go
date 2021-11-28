@@ -87,16 +87,17 @@ func difference(slice1 []string, slice2 []string) []string {
 func (p *PrimesImpl) FindPrimes(interval com.TPInterval, primeList *[]int) error {
 	REQUESTS++
 	procesada := false
-	res := make(chan Reply, 1)
-	requestChan <- PrimesImpl{interval, res}
-	for !procesada {
-		result := <-res
+	job := PrimesImpl{interval, make(chan Reply)}
+	requestChan <- job
+	for procesada != true {
+		result := <-job.ReplyChan
 		if result.err != nil {
-			fmt.Println("Tarea fallida: ", result.err, " por ", result.worker)
+			//fmt.Println("Tarea fallida: ", result.err, " por ", result.worker)
 			//Se envia que la tarea ha fallado y se vuelve a encolar
-			requestChan <- PrimesImpl{interval, res}
+			job = PrimesImpl{interval, make(chan Reply)}
+			requestChan <- job
 		} else {
-			fmt.Println("Tarea completada: ", interval, " por ", result.worker)
+			//fmt.Println("Tarea completada: ", interval, " por ", result.worker)
 			*primeList = result.primes
 			procesada = true
 		}
@@ -108,15 +109,17 @@ func resourceManager(hostUser string, remoteUser string, f *os.File) {
 	start := time.Now()
 	for {
 		time.Sleep(10 * time.Second)
+		nEnqueuedReq := len(requestChan)
 		fmt.Println("Número de peticiones: " + strconv.Itoa(REQUESTS))
-		fmt.Println("Número de workers: " + strconv.Itoa(NWORKERSUP))
+		fmt.Println("Número de workers: " + strconv.Itoa(len(IPWORKERSUP)))
 		fmt.Println("Numero de delay/omission: " + strconv.Itoa(DELAYED))
 		fmt.Println("Numero de crash: " + strconv.Itoa(CRASHED))
-		fmt.Println(time.Since(start))
-		nEnqueuedReq := len(requestChan)
 		fmt.Println("Numero de peticiones en la cola: " + strconv.Itoa(nEnqueuedReq))
-		_, err := f.WriteString(string(int(time.Since(start))) + ";" + strconv.Itoa(NWORKERSUP) + ";" +
-			"NUMERO DE CLIENTES" + ";" + strconv.Itoa(REQUESTS) + ";" + strconv.Itoa(nEnqueuedReq) + ";" + "\n")
+		t := time.Since(start)
+		fmt.Println(t)
+
+		_, err := f.WriteString(";" + strconv.Itoa(NWORKERSUP) + ";" +
+			"nc" + ";" + strconv.Itoa(REQUESTS) + ";" + strconv.Itoa(nEnqueuedReq) + "\n")
 		checkError(err)
 		REQUESTS = 0
 
@@ -130,8 +133,7 @@ func resourceManager(hostUser string, remoteUser string, f *os.File) {
 
 				workerConn, err := rpc.DialHTTP("tcp", workerDir)
 				if err == nil {
-					var res int
-					workerConn.Go("PrimesImpl.Stop", 1, &res, nil)
+					workerConn.Call("PrimesImpl.Stop", 1, nil)
 				}
 				NWORKERSUP--
 			}
@@ -140,10 +142,10 @@ func resourceManager(hostUser string, remoteUser string, f *os.File) {
 		} else {
 
 			if NWORKERSUP < MAXWORKERS {
-				fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
+				//fmt.Println("MAXWORKERS: ", MAXWORKERS) // Numero maximo de workers del sistema
 				availableDirs := difference(WORKERS, IPWORKERSUP)
-				fmt.Println("DIRECCIONES DISPONIBLES:")
-				fmt.Println(availableDirs)
+				//fmt.Println("DIRECCIONES DISPONIBLES:")
+				//fmt.Println(availableDirs)
 				dir := availableDirs[len(availableDirs)-1]
 				fmt.Println("Se lanza un worker en: ", dir)
 				go sshWorkerUp(dir, hostUser, remoteUser)
@@ -164,49 +166,45 @@ func workerManager(hostUser string, remoteUser string) {
 		time.Sleep(5000 * time.Millisecond)
 		go workerControl(workerIp)
 		fmt.Println("Reconnecting to", workerIp)
+		NWORKERSUP++
 	}
-}
-func callWorker(workerCon *rpc.Client, interval com.TPInterval, rep *[]int, errCh chan error) {
-
 }
 
 func workerControl(workerIp string) {
 	var reply []int
 	fin := false
 	w := strings.Split(workerIp, ".")
+	// Se establece una conexion TCP con el worker
+	workerCon, err := rpc.DialHTTP("tcp", workerIp)
 	for !fin {
-		select {
-		// Recibe un tabajo del canal
-		case job := <-requestChan:
-			REQUESTS++
-			// Se establece una conexion TCP con el worker
-			workerCon, err := rpc.DialHTTP("tcp", workerIp)
-			if err == nil { // Si no hay error
-				// Asynchronous call
-				divCall := workerCon.Go("PrimesImpl.FindPrimes", job.Interval, &reply, nil)
-				select {
-				//Caso en el que el worker acaba correctamente
-				case rep := <-divCall.Done:
-					//Si no hay error se guarda la respuesta en el tipo Reply
-					if rep.Error == nil {
-						job.ReplyChan <- Reply{reply, nil, w[len(w)-1]}
-					} else {
-						//Se guarda fallo
-						CRASHED++
-						job.ReplyChan <- Reply{reply, rep.Error, w[len(w)-1]}
-						//Se mete la direccion del worker caido al canal para que el worker manager lo intente levantar
-						IPWORKERS <- workerIp
-						fin = true
-					}
-				case <-time.After(3 * time.Second):
-					DELAYED++
-					//Caso en el que salta la alarma programada por el time.After
-					fmt.Println("Fallo por DELAY/OMISION")
+		if err == nil { // Si no hay error
+			// Recibe un tabajo del canal
+			job := <-requestChan
+			// Asynchronous call
+			divCall := workerCon.Go("PrimesImpl.FindPrimes", job.Interval, &reply, nil)
+			select {
+			//Caso en el que el worker responde
+			case rep := <-divCall.Done:
+				//Si no hay error se guarda la respuesta en el tipo Reply
+				if rep.Error == nil {
 					job.ReplyChan <- Reply{reply, nil, w[len(w)-1]}
+				} else {
+					//Se guarda fallo
+					CRASHED++
+					job.ReplyChan <- Reply{reply, rep.Error, w[len(w)-1]}
+					//Se mete la direccion del worker caido al canal para que el worker manager lo intente levantar
+					NWORKERSUP--
+					IPWORKERS <- workerIp
+					fin = true
 				}
-			} else {
-				fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
+			case <-time.After(3000 * time.Millisecond):
+				DELAYED++
+				//Caso en el que salta la alarma programada por el time.After
+				fmt.Println("Fallo por DELAY/OMISION")
+				job.ReplyChan <- Reply{reply, nil, w[len(w)-1]}
 			}
+		} else {
+			fmt.Errorf("No se ha podido establecer conexion con: ", workerIp)
 		}
 	}
 }
@@ -277,7 +275,7 @@ func main() {
 		fmt.Fprint(os.Stderr, "Usage:go run master.go <ip:port> <path to workers ip file> <hostUser> <remoteUser>\n")
 		os.Exit(1)
 	}
-	requestChan = make(chan PrimesImpl, 100)
+	requestChan = make(chan PrimesImpl, 1000)
 	//Ip y pueto del worker
 	ipPort := os.Args[1]
 	//Se leen las ip y puerto de fichero
@@ -315,9 +313,9 @@ func main() {
 	fmt.Println("------------------------------------------")
 	fmt.Println("SERVING ...")
 
-	a := difference(WORKERS, IPWORKERSUP)
-	fmt.Println("Available dirs: ")
-	fmt.Println(a)
+	//a := difference(WORKERS, IPWORKERSUP)
+	//fmt.Println("Available dirs: ")
+	//fmt.Println(a)
 
 	primesImpl := new(PrimesImpl)
 	rpc.Register(primesImpl)
