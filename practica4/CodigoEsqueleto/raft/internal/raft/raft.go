@@ -22,15 +22,21 @@ package raft
 
 // type AplicaOperacion
 
-
 import (
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"raft/internal/comun/rpctimeout"
+)
+
+const (
+	C = "candidate"
+	L = "leader"
+	F = "follower"
 )
 
 //  false deshabilita por completo los logs de depuracion
@@ -56,10 +62,11 @@ type AplicaOperacion struct {
 // Tipo de dato Go que representa un solo nodo (réplica) de raft
 //
 type NodoRaft struct {
-	mux   sync.Mutex       // Mutex para proteger acceso a estado compartido
+	mux   sync.Mutex		// Mutex para proteger acceso a estado compartido
 
-	nodos []string // Conexiones RPC a todos los nodos (réplicas) Raft
-	yo    int           // this peer's index into peers[]
+	nodos []string			//Conexiones RPC a todos los nodos (réplicas) Raft
+	yo    int           	// this peer's index into peers[]
+
 	// Utilización opcional de este logger para depuración
 	// Cada nodo Raft tiene su propio registro de trazas (logs)
 	logger *log.Logger
@@ -70,17 +77,27 @@ type NodoRaft struct {
 }
 
 type State struct {
-	CurrentTerm int //Mandato actual
-	VotedFor int //Candidato que ha recibido el voto en el mandto actual
-	log []string
+	CurrentTerm int 	//Mandato actual
+	VotedFor int	 	//Candidato que ha recibido el voto en el mandto actual
+	log []LogEntry
+
 	//For all servers 
-	CommitIndex int //	Índice de la última entrada cometida
-	LastApplied int //	última entrada del log aplicada en la máquina de estados
+	CommitIndex int 	//Índice de la última entrada cometida
+	LastApplied int 	//Ultima entrada del log aplicada en la máquina de estados
+
+	// Datos auxiliares de cada nodo 
+	StateNode	string	// Leader, Follower, Candidate
+	electionResetEvent time.Time // Last heart beat 
 
 	//Only for leaders 
 	NextIndex int 
 	MatchIndex int 
 	
+}
+
+type LogEntry struct {
+	Command interface{}
+	Term    int
 }
 
 
@@ -99,8 +116,7 @@ type State struct {
 //
 // NuevoNodo() debe devolver resultado rápido, por lo que se deberían
 // poner en marcha Gorutinas para trabajos de larga duracion
-func NuevoNodo(nodos []*rpc.Client, yo int, canalAplicar chan AplicaOperacion)
-			*NodoRaft {
+func NuevoNodo(nodos []*rpc.Client, yo int, canalAplicar chan AplicaOperacion) *NodoRaft {
 	nr := &NodoRaft{}
 	nr.nodos = nodos
 	nr.yo = yo
@@ -139,9 +155,8 @@ func NuevoNodo(nodos []*rpc.Client, yo int, canalAplicar chan AplicaOperacion)
 // de este nodo
 //
 func (nr *NodoRaft) Para() {
-
 	// Vuestro codigo aqui
-
+	os.Exit(n)
 }
 
 // Devuelve "yo", mandato en curso y si este nodo cree ser lider
@@ -150,10 +165,17 @@ func (nr *NodoRaft) ObtenerEstado() (int, int, bool) {
 	var yo int
 	var mandato int
 	var esLider bool
-	
 
 	// Vuestro codigo aqui
-	
+	nr.mux.Lock()
+	yo = nr.yo
+	mandato = nr.CurrentTerm
+	if nr.StateNode == L {
+		esLider = true
+	}else{
+		esLider = false
+	}
+	nr.mux.Unlock()
 
 	return yo, mandato, esLider
 }
@@ -225,16 +247,21 @@ type RespuestaPeticionVoto struct {
 //
 // Metodo para RPC PedirVoto
 //
-func (nr *NodoRaft) PedirVoto(args *ArgsPeticionVoto, reply *RespuestaPeticionVoto) {
-	// Vuestro codigo aqui
-	if args.Term < nr.CurrentTerm {
-		reply.VoteGranted = false
-	}else if (nr.VotedFor == nil | nr.VotedFor == args.CandidateId) &
-											(args.LastLogIndex >= len(nr.State.log)) {
+func (nr *NodoRaft) PedirVoto(args *ArgsPeticionVoto, 
+												reply *RespuestaPeticionVoto) {
+	nr.mux.Lock()
+	if args.Term == nr.CurrentTerm && 
+		(nr.VotedFor == nil || nr.VotedFor == args.CandidateId) {
+		//DE MOMENTO IGNORO LO DEL LOG
+		// & (args.LastLogIndex >= len(nr.State.log)) { 
 		reply.VoteGranted = true
+		nr.VotedFor = args.CandidateId
+		nr.electionResetEvent = time.Now()
 	}else {
 		reply.VoteGranted = false
 	}
+	reply.Term = nr.CurrentTerm
+	nr.mux.Unlock()
 }
 
 
@@ -277,9 +304,10 @@ func (nr *NodoRaft) enviarPeticionVoto(nodo int, args *RequestVoteArgs,
 type ArgsAppendEntries struct {
 	Term int
 	LeaderId int	
+
 	PrevLogIndex int
 	PrevLogTerm int 
-	Entries []string //log.Logger
+	Entries []LogEntry
 	LeaderCommit int
 }
 
@@ -288,13 +316,162 @@ type RespuestaAppendEntries struct {
 	Success bool
 }
 
-func (nr *NodoRaft) enviarLatido(args *ArgsAppendEntries,
+func (nr *NodoRaft) AppendEntries(args *ArgsAppendEntries,
 											reply *RespuestaAppendEntries) {
 	if args.Term < nr.CurrentTerm {
-		reply.VoteGranted = false
-	} else if (args.PrevLogTerm  != args.Entries[args.PrevLogIndex]) {
-		
-	} else {
+		reply.Success = false
+	} else if nr.log[args.PrevLogIndex].Term != args.PrevLogTerm {
+		reply.Success = false
+	} else if {
 
+	}
+}
+
+// Crear una gorutina concurrente que se responsabilice de la gestión del líder, 
+// y ponga en marcha un proceso de elección si no recibe mensajes de nadie 
+// durante un tiempo. De esta forma podrá saber quien es el líder, si ya lo hay,
+// o convertirse el mismo en líder.
+
+// Devuelve el timeout para el lider
+/*
+PAPER: 
+To prevent split votes in the first place, election timeouts 
+are chosen randomly from a fixed interval (e.g., 150–300ms).
+*/
+func (nr *NodoRaft) electionTimeout() time.Duration {
+	return time.Duration(150+rand.Intn(150)) * time.Millisecond
+}
+
+// Rutina que se encarga de inciar una eleccion si no se ha recibido latidos 
+// del lider en tD unidades de tiempo.
+func (nr *NodoRaft) runElectionTimer(){
+	
+	tD := nr.electionTimeout()
+	nr.mux.Lock()
+	termIni := nr.CurrentTerm
+	nr.mux.Unlock()
+	// Se puede dormir todo el timeout pero es mas dificil tD - 20
+	tick := time.Tick(10 * time.Millisecond)
+	defer tick.Stop() //defer
+	
+	for {
+		select {
+		case <-tick:
+			//Si no es ni Candidato ni Seguidor
+			/*if nr.StateNode != C && nr.StateNode != F {
+				break
+			}
+
+			if termIni < nr.CurrentTerm {
+				break
+			}*/
+
+			// Start an election if we haven't heard from a leader or haven't 
+			// voted for someone for the duration of the timeout.
+			if elapsed := time.Since(nr.electionResetEvent); 
+													elapsed >= timeoutDuration {
+				cm.startElection()
+				//cm.mu.Unlock()
+				break
+	  		}
+		}
+	}
+}
+
+func (nr *NodoRaft) startElection() {
+	// To begin an election, a follower increments its current
+	// term and transitions to candidate state 
+	nr.currentTerm = nr.CurrentTerm + 1
+	nr.StateNode = C
+	// It votes itself
+	nr.VotedFor = nr.yo
+
+	newTerm := nr.currentTerm
+	nr.electionResetEvent = time.Now()
+
+	votes := 1
+
+	//RequestVote RPCs in parallel to each of the other servers in the cluster.
+	for _, nodo := range nr.nodos {
+		go func(nodo string) {
+			args := ArgsPeticionVoto {
+				Term: nr.currentTerm,
+				CandidateId: nr.id,
+			}
+			var reply RequestVoteReply
+			err := nodo.Call(nodo , "NodoRaft.PedirVoto", args, &reply);
+			if  err == nil {
+				nr.mux.Lock()
+				// Se hace defer porque asi acaba cuando acaba func
+				defer nr.mux.Unlock()
+				// If the state is no longer Candidate, stop the election
+				if cm.state != C {
+					break
+				}
+				// If a reply got a term higher, the node assumes he's a follower
+				if reply.Term > newTerm {
+					nr.becomeFollower(reply.Term)
+					break
+				} else if reply.Term == newTerm && reply.VoteGranted{
+					votes += 1
+					// votes >= (N + 1)/2
+					if votes*2 > len(nr.nodos)+1 {
+						// Election won
+						nr.startLeader()
+						break
+					}
+				}
+			}
+		}(nodo)
+	}
+	// If the election is not successful, run another timer
+	go nr.runElectionTimer()
+}
+
+// Function to change a node's state to follower 
+func (nr *NodoRaft) becomeFollower(term int) {
+	nr.StateNode = F
+	nr.CurrentTerm = term
+	nr.VotedFor = nil // Valor que no pueda adquirir ningin nodo 
+	nr.electionResetEvent = time.Now()
+
+	go nr.runElectionTimer()
+}
+
+// Funciton to change a node's state to Leader
+func (nr *NodoRaft) becomeLeader(term int) {
+	nr.StateNode = L
+	go func(){
+		tick := time.Tick(10 * time.Millisecond)
+		defer tick.Stop()
+		for nr.StateNode == L {
+			<- tick 
+			nr.sendHeartBeat()
+		}
+
+	}()
+}
+
+func (nr *NodoRaft) sendHeartBeat() {
+	for _, nodo := range nr.nodos {
+		args := ArgsAppendEntries {
+			Term: nr.currentTerm,
+			LeaderId: nr.id,
+		}
+		
+		go func (nodo string){
+			var reply RequestVoteReply
+			err := nodo.Call(nodo , "NodoRaft.AppendEntries", args, &reply);
+			/*if  err == nil {
+				nr.mux.Lock()
+				// Se hace defer porque asi acaba cuando acaba func
+				defer nr.mux.Unlock()
+				// If a reply got a term higher, the node assumes he's a follower
+				if reply.Term > newTerm {
+					nr.becomeFollower(reply.Term)
+					break
+				}
+			}*/
+		}(nodo)
 	}
 }
