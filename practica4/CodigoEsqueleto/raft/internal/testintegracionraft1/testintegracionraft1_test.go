@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/rpc"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"raft/internal/despliegue"
 	"testing"
@@ -96,7 +97,7 @@ func (cr *CanalResultados) startDistributedProcesses(
 	for replica, maquina := range replicasMaquinas {
 		despliegue.ExecMutipleHosts(
 			REPLICACMD+" "+replica,
-			[]string{maquina}, make(chan string, 10), PRIVKEYFILE)
+			[]string{maquina}, make(chan string), PRIVKEYFILE)
 
 		// dar tiempo para se establezcan las replicas
 		time.Sleep(1000 * time.Millisecond)
@@ -107,11 +108,28 @@ type NrArgs struct {
 	Operacion interface{}
 }
 
+// ~/Documents/GitHub/PracticasSSDD/practica4/CodigoEsqueleto/raft/cmd/srvraft
+// /home/a779088/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft
+var PATHMAIN = "~/Documents/GitHub/PracticasSSDD/practica4/CodigoEsqueleto/raft/cmd/srvraft"
+
+func (cr *CanalResultados) startDistributedProcessesLocal(
+	replicasMaquinas map[string]string) {
+	i := 0
+	for replica := range replicasMaquinas {
+		cmd := exec.Command("/bin/bash", "-c", "cd "+PATHMAIN+"; go run main.go "+replica+" > /dev/null 2>&1 &")
+		_, _ = cmd.Output()
+		// dar tiempo para se establezcan las replicas
+		//time.Sleep(1000 * time.Millisecond) //Mas tiempo si falla
+		i++
+	}
+}
+
 func (cr *CanalResultados) stopDistributedProcesses(
 	replicasMaquinas map[string]string) {
 
 	// Parar procesos que han sido distribuidos con ssh ??
-	for replica, _ := range replicasMaquinas {
+	for replica := range replicasMaquinas {
+		fmt.Println("LA REPLICA: ", replica)
 		rpcConn, err := rpc.DialHTTP("tcp", replica)
 		if err != nil {
 			fmt.Println("Connexion Error", err)
@@ -137,10 +155,8 @@ func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
 	fmt.Println(t.Name(), ".....................")
 
 	// Poner en marcha replicas en remoto
-	cr.startDistributedProcesses(map[string]string{REPLICA1: MAQUINA1})
-
-	fmt.Println("EL START VA")
-	time.Sleep(2 * time.Second)
+	cr.startDistributedProcessesLocal(map[string]string{REPLICA1: MAQUINA1})
+	time.Sleep(3 * time.Second)
 	// Parar réplicas alamcenamiento en remoto
 	cr.stopDistributedProcesses(map[string]string{REPLICA1: MAQUINA1})
 

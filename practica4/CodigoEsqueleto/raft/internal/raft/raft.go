@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/rpc"
 	"os"
 	"sync"
@@ -53,8 +52,8 @@ const kLogOutputDir = "./logs_raft/"
 // comprometidas, envía un AplicaOperacion, con cada una de ellas, al canal
 // "canalAplicar" (funcion NuevoNodo) de la maquina de estados
 type AplicaOperacion struct {
-	indice    int // en la entrada de registro
-	operacion interface{}
+	Indice    int // en la entrada de registro
+	Operacion interface{}
 }
 
 // Tipo de dato Go que representa un solo nodo (réplica) de raft
@@ -119,7 +118,7 @@ type CommitEntry struct {
 // poner en marcha Gorutinas para trabajos de larga duracion
 func NuevoNodo(nodos []string, yo int, canalAplicar chan AplicaOperacion) *NodoRaft {
 	nr := &NodoRaft{}
-	//nr.nodos = nodos
+	// /nr.nodos = nodos
 	nr.yo = yo
 
 	if kEnableDebugLogs {
@@ -152,12 +151,13 @@ func NuevoNodo(nodos []string, yo int, canalAplicar chan AplicaOperacion) *NodoR
 
 func (nr *NodoRaft) ConnectNodes(nodes []string) {
 	for i := 0; i < len(nodes); i++ {
-		fmt.Println("EL VALOR DEL NODO ES: ", nodes[i])
-		rpcConn, err := rpc.DialHTTP("tcp", nodes[i])
-		if err != nil {
-			panic(err.Error())
+		if i != nr.yo {
+			rpcConn, err := rpc.DialHTTP("tcp", nodes[i])
+			if err != nil {
+				panic(err.Error())
+			}
+			nr.nodos = append(nr.nodos, rpcConn)
 		}
-		nr.nodos = append(nr.nodos, rpcConn)
 	}
 }
 
@@ -310,6 +310,7 @@ func (nr *NodoRaft) PedirVoto(args *ArgsPeticionVoto,
 // Y que la estructura de recuperacion de resultado sea un puntero a estructura
 // y no la estructura misma.
 //
+/*
 func (nr *NodoRaft) enviarPeticionVoto(nodo int, args *ArgsPeticionVoto,
 	reply *RespuestaPeticionVoto) bool {
 
@@ -353,7 +354,7 @@ func (nr *NodoRaft) AppendEntries(args *ArgsAppendEntries,
 		}
 	}
 
-}
+}*/
 
 // Crear una gorutina concurrente que se responsabilice de la gestión del líder,
 // y ponga en marcha un proceso de elección si no recibe mensajes de nadie
@@ -365,10 +366,10 @@ func (nr *NodoRaft) AppendEntries(args *ArgsAppendEntries,
 PAPER:
 To prevent split votes in the first place, election timeouts
 are chosen randomly from a fixed interval (e.g., 150–300ms).
-*/
+
 func (nr *NodoRaft) electionTimeout() time.Duration {
 	return time.Duration(150+rand.Intn(150)) * time.Millisecond
-}
+}*/
 
 // Rutina que se encarga de inciar una eleccion si no se ha recibido latidos
 // del lider en tD unidades de tiempo.

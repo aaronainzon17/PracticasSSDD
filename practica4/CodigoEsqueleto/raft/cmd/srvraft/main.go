@@ -9,7 +9,6 @@ import (
 	"net/rpc"
 	"os"
 	"raft/internal/raft"
-	"strconv"
 	"time"
 )
 
@@ -74,18 +73,24 @@ func (os *OpsServer) Submit(args NrArgs, reply *NrReply) error {
 
 func main() {
 	//Se lee el valor por parametro
-	rpcDir, _ := strconv.Atoi(os.Args[1])
+	rpcDir := os.Args[1]
 
 	//Parte del servidor
 	os := new(OpsServer)
 	rpc.Register(os)
 	nodos, _ := readFile("nodos.txt")
-	nr = raft.NuevoNodo(nodos, rpcDir, nil)
-	time.Sleep(3 * time.Second)
+	var index int
+	for i := 0; i < len(nodos); i++ {
+		if nodos[i] == rpcDir {
+			index = i
+		}
+	}
+	nr = raft.NuevoNodo(nodos, index, nil)
+	time.Sleep(1 * time.Second)
 	go nr.ConnectNodes(nodos)
 	rpc.Register(nr)
 	rpc.HandleHTTP()
-	l, err := net.Listen("tcp", nodos[rpcDir])
+	l, err := net.Listen("tcp", rpcDir)
 	if err != nil {
 		fmt.Println("Listen error:", err)
 	}
