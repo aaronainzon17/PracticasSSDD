@@ -1,15 +1,20 @@
-package testintegracionraft1
+package testintegracionraft1_test
 
 import (
 	"fmt"
-	"log"
-	"math/rand"
+	"net/rpc"
 	"os"
 	"path/filepath"
-	"strconv"
+	"raft/internal/despliegue"
 	"testing"
 	"time"
 )
+
+// PATH de los ejecutables de modulo golang de servicio de vistas
+var PATH = filepath.Join(os.Getenv("HOME"), "tmp", "P4", "raft")
+
+// go run testcltvts/main.go 127.0.0.1:29003 127.0.0.1:29001 127.0.0.1:29000
+var REPLICACMD = "cd " + PATH + "; go run " + EXECREPLICA
 
 const (
 	//hosts
@@ -28,22 +33,16 @@ const (
 	REPLICA2 = MAQUINA2 + ":" + PUERTOREPLICA2
 	REPLICA3 = MAQUINA3 + ":" + PUERTOREPLICA3
 
-	// PATH de los ejecutables de modulo golang de servicio de vistas
-	PATH = filepath.Join(os.Getenv("HOME"), "tmp", "P4", "raft")
-
 	// paquete main de ejecutables relativos a PATH previo
 	EXECREPLICA = "cmd/srvraft/main.go "
 
 	// comandos completo a ejecutar en máquinas remota con ssh. Ejemplo :
 	// 				cd $HOME/raft; go run cmd/srvraft/main.go 127.0.0.1:29001
 
-	// go run testcltvts/main.go 127.0.0.1:29003 127.0.0.1:29001 127.0.0.1:29000
-	REPLICACMD = "cd " + PATH + "; go run " + EXECREPLICA
-
 	// Ubicar, en esta constante, nombre de fichero de vuestra clave privada local
 	// emparejada con la clave pública en authorized_keys de máquinas remotas
 
-	PRIVKEYFILE = "id_ed25519"
+	PRIVKEYFILE = "id_rsa"
 )
 
 // TEST primer rango
@@ -59,55 +58,72 @@ func TestPrimerasPruebas(t *testing.T) { // (m *testing.M) {
 		func(t *testing.T) { cr.soloArranqueYparadaTest1(t) })
 
 	// Test2 : No debería haber ningun primario, si SV no ha recibido aún latidos
-	t.Run("T1:ElegirPrimerLider",
-		func(t *testing.T) { cr.elegirPrimerLiderTest2(t) })
+	//t.Run("T1:ElegirPrimerLider",
+	//	func(t *testing.T) { cr.ElegirPrimerLiderTest2(t) })
 
 	// Test3: tenemos el primer primario correcto
-	t.Run("T2:FalloAnteriorElegirNuevoLider",
+	/*t.Run("T2:FalloAnteriorElegirNuevoLider",
 		func(t *testing.T) { cr.falloAnteriorElegirNuevoLiderTest3(t) })
 
 	// Test4: Primer nodo copia
 	t.Run("T3:EscriturasConcurrentes",
 		func(t *testing.T) { cr.tresOperacionesComprometidasEstable(t) })
-
+	*/
 	// tear down code
 	// eliminar procesos en máquinas remotas
-	cr.stop()
+	//cr.stop()
 }
 
 // ---------------------------------------------------------------------
-// 
+//
 // Canal de resultados de ejecución de comandos ssh remotos
 type CanalResultados chan string
 
-func (cr *CanalResultados) stop() {
-	close(ts.cmdOutput)
+/*func (cr *CanalResultados) stop() {
+	//close(ts.cmdOutput)
 
 	// Leer las salidas obtenidos de los comandos ssh ejecutados
 	for s := range cr {
 		fmt.Println(s)
 	}
-}
+}*/
 
 // start  gestor de vistas; mapa de replicas y maquinas donde ubicarlos;
 // y lista clientes (host:puerto)
 func (cr *CanalResultados) startDistributedProcesses(
-										replicasMaquinas map[string]string) {
+	replicasMaquinas map[string]string) {
 
 	for replica, maquina := range replicasMaquinas {
-			despliegue.ExecMutipleHosts(
-			REPLICACMD + " " + replica,
-			[]string{maquina}, ts.cmdOutput, PRIVKEYFILE)
+		despliegue.ExecMutipleHosts(
+			REPLICACMD+" "+replica,
+			[]string{maquina}, make(chan string, 10), PRIVKEYFILE)
 
 		// dar tiempo para se establezcan las replicas
 		time.Sleep(1000 * time.Millisecond)
 	}
 }
 
-//
-func (cr *CanalResultados) stopDistributedProcesses(???) {
+type NrArgs struct {
+	Operacion interface{}
+}
+
+func (cr *CanalResultados) stopDistributedProcesses(
+	replicasMaquinas map[string]string) {
 
 	// Parar procesos que han sido distribuidos con ssh ??
+	for replica, _ := range replicasMaquinas {
+		rpcConn, err := rpc.DialHTTP("tcp", replica)
+		if err != nil {
+			fmt.Println("Connexion Error", err)
+			os.Exit(1)
+		}
+
+		err = rpcConn.Call("OpsServer.StopNode", NrArgs{}, nil)
+		if err != nil {
+			fmt.Println("Unable to exit\n", err)
+		}
+
+	}
 
 }
 
@@ -123,31 +139,31 @@ func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
 	// Poner en marcha replicas en remoto
 	cr.startDistributedProcesses(map[string]string{REPLICA1: MAQUINA1})
 
+	fmt.Println("EL START VA")
+	time.Sleep(2 * time.Second)
 	// Parar réplicas alamcenamiento en remoto
-	cr.stopDistributedProcesses(??)
+	cr.stopDistributedProcesses(map[string]string{REPLICA1: MAQUINA1})
 
 	fmt.Println(".............", t.Name(), "Superado")
 }
 
 // Primer lider en marcha
-func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
-	//t.Skip("SKIPPED ElegirPrimerLiderTest2")
+/*func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
+	t.Skip("SKIPPED ElegirPrimerLiderTest2")
 
 	fmt.Println(t.Name(), ".....................")
 
 	// Poner en marcha  3 réplicas Raft
 	replicasMaquinas :=
-		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: 																	MAQUINA3}
+		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
 	cr.startDistributedProcesses(replicasMaquinas)
-
 
 	// Se ha elegido lider ?
 	fmt.Printf("Probando lider en curso\n")
 	pruebaUnLider()
 
-
 	// Parar réplicas alamcenamiento en remoto
-	ts.stopDistributedProcesses(??)
+	cr.stopDistributedProcesses(replicasMaquinas)
 
 	fmt.Println(".............", t.Name(), "Superado")
 }
@@ -160,22 +176,20 @@ func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
 
 	// Poner en marcha  3 réplicas Raft
 	replicasMaquinas :=
-		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: 																	MAQUINA3}
+		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
 	cr.startDistributedProcesses(replicasMaquinas)
 
 	fmt.Printf("Lider inicial\n")
 	pruebaUnLider()
-
 
 	// Desconectar lider
 	// ???
 
 	fmt.Printf("Comprobar nuevo lider\n")
 	pruebaUnLider()
-	
 
 	// Parar réplicas almacenamiento en remoto
-	ts.stopDistributedProcesses(??)
+	//ts.stopDistributedProcesses(??)
 
 	fmt.Println(".............", t.Name(), "Superado")
 }
@@ -206,7 +220,7 @@ func pruebaUnLider() int {
 		for t, lideres := range mapaLideres {
 			if len(lideres) > 1 {
 				cfg.t.Fatalf("mandato %d tiene %d (>1) lideres",
-														t, len(lideres))
+					t, len(lideres))
 			}
 			if t > ultimoMandatoConLider {
 				ultimoMandatoConLider = t
@@ -214,12 +228,12 @@ func pruebaUnLider() int {
 		}
 
 		if len(mapaLideres) != 0 {
-			
-			return mapaLideres[ultimoMandatoConLider][0]  // Termina
-			
+
+			return mapaLideres[ultimoMandatoConLider][0] // Termina
+
 		}
 	}
 	cfg.t.Fatalf("un lider esperado, ninguno obtenido")
-	
-	return -1   // Termina
-}
+
+	return -1 // Termina
+}*/

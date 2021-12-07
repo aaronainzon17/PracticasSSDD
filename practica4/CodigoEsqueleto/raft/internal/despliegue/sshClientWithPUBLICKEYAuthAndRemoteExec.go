@@ -1,7 +1,7 @@
 // Implementacion de despliegue en ssh de multiples nodos
 //
 // Unica funcion exportada :
-//		func ExecMutipleNodes(cmd string,
+//		func ExecMutipleHosts(cmd string,
 //							  hosts []string,
 //							  results chan<- string,
 //							  privKeyFile string)
@@ -12,7 +12,6 @@ package despliegue
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -77,11 +76,11 @@ func executeCmd(cmd, hostname string, config *ssh.ClientConfig) string {
 	session.Stdout = &stdoutBuf
 	session.Stderr = &stdoutBuf
 
-	fmt.Println("ANTES RUN", cmd)
+	//fmt.Println("ANTES RUN", cmd)
 
 	session.Run(cmd)
 
-	fmt.Println("TRAS RUN", cmd)
+	//fmt.Println("TRAS RUN", cmd)
 
 	return hostname + ": \n" + stdoutBuf.String()
 }
@@ -96,29 +95,29 @@ func buildSSHConfig(signer ssh.Signer,
 			ssh.PublicKeys(signer),
 		},
 		// verify host public key
-		HostKeyCallback: ssh.FixedHostKey(hostKey),
+		//HostKeyCallback: ssh.FixedHostKey(hostKey),
 		// Non-production only
-		//HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		// optional tcp connect timeout
 		Timeout: 5 * time.Second,
 	}
 }
 
-func execOneNode(hostname string, results chan<- string,
+func execOneHost(hostname string, results chan<- string,
 	signer ssh.Signer, cmd string) {
 	// get host public key
 	// ssh_config must have option "HashKnownHosts no" !!!!
 	hostKey := getHostKey(hostname)
 	config := buildSSHConfig(signer, hostKey)
 
-	fmt.Println(cmd)
-	fmt.Println(hostname)
+	//fmt.Println(cmd)
+	//fmt.Println(hostname)
 
 	results <- executeCmd(cmd, hostname, config)
 }
 
 // Ejecutar un mismo comando en múltiples hosts mediante ssh
-func ExecMutipleNodes(cmd string,
+func ExecMutipleHosts(cmd string,
 	hosts []string,
 	results chan<- string,
 	privKeyFile string) {
@@ -127,7 +126,10 @@ func ExecMutipleNodes(cmd string,
 
 	//Read private key file for user
 	pkey, err := ioutil.ReadFile(
-						  filepath.Join(os.Getenv("HOME"), ".ssh", privKeyFile))
+		filepath.Join(os.Getenv("HOME"), ".ssh", privKeyFile))
+
+	//fmt.Println("PrivKey: ", string(pkey))
+
 	if err != nil {
 		log.Fatalf("unable to read private key: %v", err)
 	}
