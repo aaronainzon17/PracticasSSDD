@@ -75,6 +75,10 @@ func (os *OpsServer) NodeState(args NrArgs, reply *string) error {
 }
 
 func main() {
+	if len(os.Args) != 2 {
+		fmt.Fprint(os.Stderr, "Usage: go run main.go <ip:port>\n")
+		os.Exit(1)
+	}
 	//Se lee el valor por parametro
 	rpcDir := os.Args[1]
 

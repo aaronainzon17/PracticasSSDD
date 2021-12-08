@@ -65,12 +65,12 @@ func TestPrimerasPruebas(t *testing.T) { // (m *testing.M) {
 		func(t *testing.T) { cr.ElegirPrimerLiderTest2(t) })
 
 	// Test3: tenemos el primer primario correcto
-	/*t.Run("T2:FalloAnteriorElegirNuevoLider",
-		func(t *testing.T) { cr.falloAnteriorElegirNuevoLiderTest3(t) })
+	t.Run("T2:FalloAnteriorElegirNuevoLider",
+		func(t *testing.T) { cr.FalloAnteriorElegirNuevoLiderTest3(t) })
 
 	// Test4: Primer nodo copia
-	t.Run("T3:EscriturasConcurrentes",
-		func(t *testing.T) { cr.tresOperacionesComprometidasEstable(t) })
+	/*t.Run("T3:EscriturasConcurrentes",
+	func(t *testing.T) { cr.tresOperacionesComprometidasEstable(t) })
 	*/
 	// tear down code
 	// eliminar procesos en máquinas remotas
@@ -132,19 +132,17 @@ func (cr *CanalResultados) stopDistributedProcesses(
 	// Parar procesos que han sido distribuidos con ssh ??
 	for replica := range replicasMaquinas {
 		rpcConn, err := rpc.DialHTTP("tcp", replica)
-		if err != nil {
-			fmt.Println("Connexion Error", err)
-			os.Exit(1)
+		if err == nil {
+			var reply int
+			err = rpcConn.Call("OpsServer.StopNode", NrArgs{}, &reply)
+			if err != nil {
+				fmt.Println("Unable to exit\n", err)
+				os.Exit(1)
+			}
+		} else {
+			fmt.Println("stopDistributedProcesses conn error", err)
 		}
-		var reply int
-		err = rpcConn.Call("OpsServer.StopNode", NrArgs{}, &reply)
-		if err != nil {
-			fmt.Println("Unable to exit\n", err)
-			os.Exit(1)
-		}
-
 	}
-
 }
 
 // --------------------------------------------------------------------------
@@ -167,7 +165,7 @@ func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
 
 // Primer lider en marcha
 func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
-	//t.Skip("SKIPPED ElegirPrimerLiderTest2")
+	t.Skip("SKIPPED ElegirPrimerLiderTest2")
 
 	fmt.Println(t.Name(), ".....................")
 
@@ -195,19 +193,19 @@ func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
 	// Poner en marcha  3 réplicas Raft
 	replicasMaquinas :=
 		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
-	cr.startDistributedProcesses(replicasMaquinas)
-
+	cr.startLocalProcesses(replicasMaquinas)
+	time.Sleep(2 * time.Second)
 	fmt.Printf("Lider inicial\n")
 	pruebaUnLider(replicasMaquinas)
 
 	// Desconectar lider
-	// ???
-
+	desconectaLider(replicasMaquinas)
+	time.Sleep(2 * time.Second)
 	fmt.Printf("Comprobar nuevo lider\n")
 	pruebaUnLider(replicasMaquinas)
 
-	// Parar réplicas almacenamiento en remoto
-	//ts.stopDistributedProcesses(??)
+	// Parar réplicas alamcenamiento en remoto
+	cr.stopDistributedProcesses(replicasMaquinas)
 
 	fmt.Println(".............", t.Name(), "Superado")
 }
@@ -229,17 +227,18 @@ func pruebaUnLider(replicasMaquinas map[string]string) int {
 		i := 0
 		for replica := range replicasMaquinas {
 			rpcConn, err := rpc.DialHTTP("tcp", replica)
-			if err != nil {
+			if err == nil {
+				var reply string
+				err = rpcConn.Call("OpsServer.NodeState", NrArgs{}, &reply)
+				if err != nil {
+					fmt.Println("No se puede obtener el estado\n", err)
+				}
+				if reply == "leader" {
+					mapaLideres[iters] = append(mapaLideres[iters], i)
+				}
+
+			} else {
 				fmt.Println("pruebaUnLider conn err: ", err)
-				os.Exit(1)
-			}
-			var reply string
-			err = rpcConn.Call("OpsServer.NodeState", NrArgs{}, &reply)
-			if err != nil {
-				fmt.Println("No se puede obtener el estado\n", err)
-			}
-			if reply == "leader" {
-				mapaLideres[iters] = append(mapaLideres[iters], i)
 			}
 			i++
 		}
@@ -263,4 +262,33 @@ func pruebaUnLider(replicasMaquinas map[string]string) int {
 	fmt.Println("un lider esperado, ninguno obtenido")
 
 	return -1 // Termina
+}
+
+func desconectaLider(replicasMaquinas map[string]string) {
+
+	i := 0
+	for replica := range replicasMaquinas {
+		rpcConn, err := rpc.DialHTTP("tcp", replica)
+		if err == nil {
+			var reply string
+			err = rpcConn.Call("OpsServer.NodeState", NrArgs{}, &reply)
+			if err != nil {
+				fmt.Println("No se puede obtener el estado\n", err)
+			}
+			if reply == "leader" {
+				var reply int
+				err = rpcConn.Call("OpsServer.StopNode", NrArgs{}, &reply)
+				if err != nil {
+					fmt.Println("Unable to exit\n", err)
+					os.Exit(1)
+				} else {
+					fmt.Println("Leader ", replica, "stopped")
+				}
+			}
+		} else {
+			fmt.Println("desconectaLider conn err: ", err)
+			os.Exit(1)
+		}
+		i++
+	}
 }

@@ -283,20 +283,15 @@ type RespuestaPeticionVoto struct {
 //
 func (nr *NodoRaft) PedirVoto(args *ArgsPeticionVoto,
 	reply *RespuestaPeticionVoto) error {
-	fmt.Println("RECIBO UNA PETICION DE VOTO")
 	nr.mux.Lock()
-	fmt.Println(args.Term, " - ", nr.CurrentTerm)
 	if args.Term > nr.CurrentTerm {
 		nr.becomeFollower(args.Term)
 	}
 	if args.Term < nr.CurrentTerm {
 		reply.VoteGranted = false
 	}
-	fmt.Println(nr.VotedFor, " - ", args.CandidateId)
 	if nr.CurrentTerm == args.Term &&
 		(nr.VotedFor == -1 || nr.VotedFor == args.CandidateId) {
-		//DE MOMENTO IGNORO LO DEL LOG
-		// & (args.LastLogIndex >= len(nr.State.log)) {
 		reply.VoteGranted = true
 		nr.VotedFor = args.CandidateId
 		nr.electionResetEvent = time.Now()
@@ -336,11 +331,17 @@ func (nr *NodoRaft) PedirVoto(args *ArgsPeticionVoto,
 // y no la estructura misma.
 //
 
-func (nr *NodoRaft) enviarPeticionVoto(nodo int, args *ArgsPeticionVoto,
+func (nr *NodoRaft) enviarPeticionVoto(nodo *rpc.Client, args *ArgsPeticionVoto,
 	reply *RespuestaPeticionVoto) bool {
+	var ok bool
+	err := rpctimeout.CallTimeout(nodo, "NodoRaft.PedirVoto", args,
+		&reply, 10*time.Millisecond)
 
-	// Completar....
-	ok := false
+	if err != nil {
+		ok = false
+	} else {
+		ok = true
+	}
 
 	return ok
 }
@@ -405,7 +406,6 @@ func (nr *NodoRaft) gestionDeLider() {
 		// voted for someone for the duration of the timeout.
 		elapsed := time.Since(nr.electionResetEvent)
 		if elapsed >= timeout && nr.StateNode == F {
-			fmt.Println("Empiezan elecciones por el nodo ", nr.yo, " timeout: ", timeout)
 			nr.elecciones()
 			eleccion = true
 		}
@@ -433,9 +433,8 @@ func (nr *NodoRaft) elecciones() {
 		}
 		args := ArgsPeticionVoto{Term: storedTerm, CandidateId: nr.yo}
 		var reply RespuestaPeticionVoto
-		err := rpctimeout.CallTimeout(nodo, "NodoRaft.PedirVoto", args,
-			&reply, 10*time.Millisecond)
-		if err == nil {
+
+		if res := nr.enviarPeticionVoto(nodo, &args, &reply); res {
 			fmt.Println("Me han contestado:", reply.VoteGranted)
 			fmt.Println(storedTerm, " - ", reply.Term)
 			//nr.mux.Lock()
