@@ -35,7 +35,6 @@ func checkError(err error) {
 
 func readFile(path string) ([]string, int) {
 	fmt.Println("entra a leer el fichero ", path)
-
 	f, err := os.Open(path)
 	checkError(err)
 	nWorkers := 0
@@ -58,8 +57,7 @@ func parar() {
 	time.Sleep(100 * time.Millisecond)
 	nr.Para()
 }
-
-func (os *OpsServer) StopNode(args NrArgs, reply *NrReply) error {
+func (os *OpsServer) StopNode(args NrArgs, reply *int) error {
 	fmt.Println("Stopping node")
 	time.Sleep(2 * time.Second)
 	go parar()
@@ -68,6 +66,11 @@ func (os *OpsServer) StopNode(args NrArgs, reply *NrReply) error {
 
 func (os *OpsServer) Submit(args NrArgs, reply *NrReply) error {
 	reply.Indice, reply.Mandato, reply.EsLider = nr.SometerOperacion(args)
+	return nil
+}
+
+func (os *OpsServer) NodeState(args NrArgs, reply *string) error {
+	*reply = nr.StateNode
 	return nil
 }
 
@@ -86,14 +89,16 @@ func main() {
 		}
 	}
 	nr = raft.NuevoNodo(nodos, index, nil)
-	time.Sleep(1 * time.Second)
-	go nr.ConnectNodes(nodos)
 	rpc.Register(nr)
 	rpc.HandleHTTP()
 	l, err := net.Listen("tcp", rpcDir)
 	if err != nil {
 		fmt.Println("Listen error:", err)
 	}
+	time.Sleep(4 * time.Second)
+	go nr.ConnectNodes(nodos)
+	fmt.Println("Conexion entre nodos correcta")
+	fmt.Println("Soy ", nr.StateNode)
 	http.Serve(l, nil)
 
 }
