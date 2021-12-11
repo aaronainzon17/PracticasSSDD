@@ -69,9 +69,9 @@ func TestPrimerasPruebas(t *testing.T) { // (m *testing.M) {
 		func(t *testing.T) { cr.FalloAnteriorElegirNuevoLiderTest3(t) })
 
 	// Test4: Primer nodo copia
-	/*t.Run("T3:EscriturasConcurrentes",
-	func(t *testing.T) { cr.tresOperacionesComprometidasEstable(t) })
-	*/
+	t.Run("T3:EscriturasConcurrentes",
+		func(t *testing.T) { cr.tresOperacionesComprometidasEstable(t) })
+
 	// tear down code
 	// eliminar procesos en máquinas remotas
 	//cr.stop()
