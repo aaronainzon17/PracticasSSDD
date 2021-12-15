@@ -9,6 +9,7 @@ import (
 	"net/rpc"
 	"os"
 	"raft/internal/raft"
+	"strconv"
 	"time"
 )
 
@@ -81,6 +82,7 @@ func main() {
 	}
 	//Se lee el valor por parametro
 	rpcDir := os.Args[1]
+	fmt.Println("LA DIRECCION POR PARAMETRO " + rpcDir)
 
 	//Parte del servidor
 	os := new(OpsServer)
@@ -92,6 +94,7 @@ func main() {
 			index = i
 		}
 	}
+	fmt.Println("EL INDICE DEL NODO " + strconv.Itoa(index))
 	nr = raft.NuevoNodo(nodos, index, make(chan raft.AplicaOperacion))
 	rpc.Register(nr)
 	rpc.HandleHTTP()

@@ -64,9 +64,13 @@ func TestPrimerasPruebas(t *testing.T) { // (m *testing.M) {
 	t.Run("T1:ElegirPrimerLider",
 		func(t *testing.T) { cr.ElegirPrimerLiderTest2(t) })
 
+	time.Sleep(2 * time.Second)
+
 	// Test3: tenemos el primer primario correcto
 	t.Run("T2:FalloAnteriorElegirNuevoLider",
 		func(t *testing.T) { cr.FalloAnteriorElegirNuevoLiderTest3(t) })
+
+	time.Sleep(2 * time.Second)
 
 	// Test4: Primer nodo copia
 	t.Run("T3:EscriturasConcurrentes",
@@ -95,10 +99,11 @@ type CanalResultados chan string
 // y lista clientes (host:puerto)
 func (cr *CanalResultados) startDistributedProcesses(
 	replicasMaquinas map[string]string) {
+	cmd := "cd ~/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft; go run main.go "
 
 	for replica, maquina := range replicasMaquinas {
 		despliegue.ExecMutipleHosts(
-			REPLICACMD+" "+replica+" > /dev/null 2>&1 &",
+			cmd+replica+" > /dev/null 2>&1 &",
 			[]string{maquina}, make(chan string), PRIVKEYFILE)
 
 		// dar tiempo para se establezcan las replicas
@@ -161,7 +166,7 @@ func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
 	fmt.Println(t.Name(), ".....................")
 
 	// Poner en marcha replicas en remoto
-	cr.startLocalProcesses(map[string]string{REPLICA1: MAQUINA1})
+	cr.startDistributedProcesses(map[string]string{REPLICA1: MAQUINA1})
 	time.Sleep(2 * time.Second)
 	// Parar réplicas alamcenamiento en remoto
 	cr.stopDistributedProcesses(map[string]string{REPLICA1: MAQUINA1})
@@ -171,14 +176,14 @@ func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
 
 // Primer lider en marcha
 func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
-	t.Skip("SKIPPED ElegirPrimerLiderTest2")
+	//t.Skip("SKIPPED ElegirPrimerLiderTest2")
 
 	fmt.Println(t.Name(), ".....................")
 
 	// Poner en marcha  3 réplicas Raft
 	replicasMaquinas :=
 		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
-	cr.startLocalProcesses(replicasMaquinas)
+	cr.startDistributedProcesses(replicasMaquinas)
 	time.Sleep(2 * time.Second)
 	// Se ha elegido lider ?
 	fmt.Printf("Probando lider en curso\n")
@@ -192,14 +197,14 @@ func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
 
 // Fallo de un primer lider y reeleccion de uno nuevo
 func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
-	t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
+	//t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
 
 	fmt.Println(t.Name(), ".....................")
 
 	// Poner en marcha  3 réplicas Raft
 	replicasMaquinas :=
 		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
-	cr.startLocalProcesses(replicasMaquinas)
+	cr.startDistributedProcesses(replicasMaquinas)
 	time.Sleep(2 * time.Second)
 	fmt.Printf("Lider inicial\n")
 	pruebaUnLider(replicasMaquinas)
@@ -225,7 +230,7 @@ func (cr *CanalResultados) tresOperacionesComprometidasEstable(t *testing.T) {
 	// Poner en marcha  3 réplicas Raft
 	replicasMaquinas :=
 		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
-	//cr.startLocalProcesses(replicasMaquinas)
+	cr.startDistributedProcesses(replicasMaquinas)
 	time.Sleep(2 * time.Second)
 	cmds := []string{"op1", "op2", "op3"}
 	for _, cmd := range cmds {
@@ -238,12 +243,7 @@ func (cr *CanalResultados) tresOperacionesComprometidasEstable(t *testing.T) {
 					fmt.Println("No se puede obtener el estado\n", err)
 				}
 				if reply == "leader" {
-					replyOp := someterOperacionTest(NrArgs{Operacion: cmd}, rpcConn)
-					if replyOp.EsLider {
-						fmt.Println("a")
-					} else {
-						fmt.Println("b")
-					}
+					someterOperacionTest(NrArgs{Operacion: cmd}, rpcConn)
 				}
 
 			} else {
@@ -336,12 +336,11 @@ func desconectaLider(replicasMaquinas map[string]string) {
 	}
 }
 
-func someterOperacionTest(args NrArgs, rpcConn *rpc.Client) NrReply {
+func someterOperacionTest(args NrArgs, rpcConn *rpc.Client) {
 	var reply NrReply
 	err := rpcConn.Call("OpsServer.Submit", args, &reply)
 	if err != nil {
 		fmt.Println("Couldn't submit operation\n", err)
 		os.Exit(1)
 	}
-	return reply
 }

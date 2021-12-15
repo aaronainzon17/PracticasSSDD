@@ -430,18 +430,27 @@ func (nr *NodoRaft) gestionDeLider() {
 }
 
 func (nr *NodoRaft) elecciones() {
-	// El nodo cambia a Candidato e incrementa el mandato
-	nr.mux.Lock() //Creo que el mutex no hace falta porque no se lanza una gorutina
 	nr.CurrentTerm = nr.CurrentTerm + 1
-	storedTerm := nr.CurrentTerm
 	nr.StateNode = C
-	// Se vota a si mismo
 	nr.VotedFor = nr.yo
-
 	nr.electionResetEvent = time.Now()
-	nr.mux.Unlock()
-	votos := 1
 
+	votos := nr.hacerElecciones(nr.CurrentTerm)
+
+	// votos >= (N + 1)/2
+	if votos*2 >= len(nr.nodos)+1 {
+		// Gana la eleccion y se convierte en lider
+		fmt.Println("HE GANADO CON ", votos, " VOTOS")
+		go nr.becomeLeader(nr.CurrentTerm)
+	} else {
+		nr.mux.Lock()
+		nr.becomeFollower(nr.CurrentTerm - 1)
+		nr.mux.Unlock()
+	}
+}
+
+func (nr *NodoRaft) hacerElecciones(storedTerm int) int {
+	votos := 1
 	//RequestVote RPCs in parallel to each of the other servers in the cluster.
 	for _, nodo := range nr.nodos {
 		if nodo != nil {
@@ -469,19 +478,7 @@ func (nr *NodoRaft) elecciones() {
 			}
 		}
 	}
-	// votos >= (N + 1)/2
-	if votos*2 > len(nr.nodos)+1 {
-		// Gana la eleccion y se convierte en lider
-		fmt.Println("HE GANADO CON ", votos, " VOTOS")
-		go nr.becomeLeader(storedTerm)
-	} else {
-		//Si no se ganan las elecciones
-		fmt.Println("SE REINCIA LA RUTINA DE GESTION LIDER")
-		nr.mux.Lock()
-		nr.becomeFollower(storedTerm - 1)
-		nr.mux.Unlock()
-		go nr.gestionDeLider()
-	}
+	return votos
 }
 
 // Function to change a node's state to follower
@@ -540,7 +537,7 @@ func (nr *NodoRaft) sendHeartBeat() {
 									matchLog++
 								}
 							}
-							if matchLog*2 > len(nr.nodos)+1 {
+							if matchLog*2 >= len(nr.nodos)+1 {
 								nr.CommitIndex = i
 								aplica := AplicaOperacion{
 									Indice:    i,
