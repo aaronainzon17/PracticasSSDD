@@ -159,6 +159,7 @@ func NuevoNodo(nodos []string, yo int, canalAplicar chan AplicaOperacion) *NodoR
 	nr.MatchIndex = make([]int, len(nodos))
 	nr.electionResetEvent = time.Now()
 	fmt.Println("Soy el nodo: ", nr.yo, "y soy ", nr.StateNode)
+	fmt.Println("Longitud: ", len(nr.NextIndex), "Longitud: ", len(nr.MatchIndex))
 
 	return nr
 }
@@ -171,9 +172,10 @@ func (nr *NodoRaft) ConnectNodes(nodes []string) {
 				panic(err.Error())
 			}
 			nr.nodos = append(nr.nodos, rpcConn)
+		} else {
+			nr.nodos = append(nr.nodos, nil)
 		}
 	}
-
 	for _, node := range nr.nodos {
 		fmt.Println("CONOZCO A:", node)
 	}
@@ -379,12 +381,13 @@ func (nr *NodoRaft) AppendEntries(args *ArgsAppendEntries,
 		if args.PrevLogIndex == -1 || (len(nr.log) > args.PrevLogIndex &&
 			nr.log[args.PrevLogIndex].Term == args.PrevLogTerm) {
 			reply.Success = true
-			fmt.Println("ME LLEGAN ENTRIES")
 			// Como en P4 no hay errores se obvian las comprobaciones
 			//Faltan comprobaciones aunque son P5
-			nr.log = append(nr.log[:args.PrevLogIndex+1], args.Entries...)
-			fmt.Println("Se ha almacenado una op en el LOG")
-			fmt.Println(nr.log)
+			nr.log = append(nr.log, args.Entries...)
+			if len(args.Entries) > 0 {
+				fmt.Println("Se ha almacenado una op en el LOG")
+				fmt.Println(nr.log)
+			}
 		}
 		//Si se ha actualizado el CommitIndex del lider y mi logger tambien => actualizo mi commit index
 		if args.LeaderCommit > nr.CommitIndex && args.LeaderCommit == len(nr.log) {
@@ -414,11 +417,13 @@ func (nr *NodoRaft) gestionDeLider() {
 	// es, se incia una votacion.
 	for !eleccion {
 		<-tick.C
+		//nr.mux.Lock()
 		// Start an election if we haven't heard from a leader or haven't
 		// voted for someone for the duration of the timeout.
 		elapsed := time.Since(nr.electionResetEvent)
 		if elapsed >= timeout && nr.StateNode == F {
 			nr.elecciones()
+			//nr.mux.Unlock()
 			eleccion = true
 		}
 	}
@@ -439,26 +444,28 @@ func (nr *NodoRaft) elecciones() {
 
 	//RequestVote RPCs in parallel to each of the other servers in the cluster.
 	for _, nodo := range nr.nodos {
-		// Si ha llegado una llamada de un lider y ha cambiado a seguidor
-		// se detiene la votacion
-		if nr.StateNode != C {
-			fmt.Println("Estoy en elecciones y no soy candidato ME VOY")
-			break
-		}
-		nr.mux.Lock()
-		lastLogIndex, lastLogTerm := nr.getLastLogData()
-		nr.mux.Unlock()
-		args := ArgsPeticionVoto{Term: storedTerm, CandidateId: nr.yo,
-			LastLogIndex: lastLogIndex, LastLogTerm: lastLogTerm}
-		var reply RespuestaPeticionVoto
-
-		if res := nr.enviarPeticionVoto(nodo, &args, &reply); res {
-			if storedTerm < reply.Term {
-				nr.becomeFollower(reply.Term)
+		if nodo != nil {
+			// Si ha llegado una llamada de un lider y ha cambiado a seguidor
+			// se detiene la votacion
+			if nr.StateNode != C {
+				fmt.Println("Estoy en elecciones y no soy candidato ME VOY")
 				break
 			}
-			if (reply.Term == storedTerm) && reply.VoteGranted {
-				votos += 1
+			nr.mux.Lock()
+			lastLogIndex, lastLogTerm := nr.getLastLogData()
+			nr.mux.Unlock()
+			args := ArgsPeticionVoto{Term: storedTerm, CandidateId: nr.yo,
+				LastLogIndex: lastLogIndex, LastLogTerm: lastLogTerm}
+			var reply RespuestaPeticionVoto
+
+			if res := nr.enviarPeticionVoto(nodo, &args, &reply); res {
+				if storedTerm < reply.Term {
+					nr.becomeFollower(reply.Term)
+					break
+				}
+				if (reply.Term == storedTerm) && reply.VoteGranted {
+					votos += 1
+				}
 			}
 		}
 	}
@@ -471,9 +478,7 @@ func (nr *NodoRaft) elecciones() {
 		//Si no se ganan las elecciones
 		fmt.Println("SE REINCIA LA RUTINA DE GESTION LIDER")
 		nr.mux.Lock()
-		nr.VotedFor = -1
-		nr.StateNode = F
-		nr.CurrentTerm = nr.CurrentTerm - 1
+		nr.becomeFollower(storedTerm - 1)
 		nr.mux.Unlock()
 		go nr.gestionDeLider()
 	}
@@ -492,13 +497,14 @@ func (nr *NodoRaft) becomeFollower(term int) {
 // Funcion que inicializa un lider
 func (nr *NodoRaft) becomeLeader(term int) {
 	fmt.Println("SOY EL LIDER DEL MANDATO ", term)
+	nr.mux.Lock()
 	nr.StateNode = L
 	//Se inicializan NextIndex y MatchIndex
-	for i := range nr.nodos {
+	for i := 0; i < len(nr.nodos); i++ {
 		nr.NextIndex[i] = len(nr.log)
 		nr.MatchIndex[i] = -1
 	}
-	//go nr.checkLogs()
+	nr.mux.Unlock()
 	tick := time.NewTicker(50 * time.Millisecond)
 	defer tick.Stop()
 	for nr.StateNode == L {
@@ -510,50 +516,53 @@ func (nr *NodoRaft) becomeLeader(term int) {
 //Funcion encargada de enviar latidos a todos los nodos
 func (nr *NodoRaft) sendHeartBeat() {
 	for i, nodo := range nr.nodos {
-		args := nr.makeAppendEntriesArgs(i)
-		var reply RespuestaAppendEntries
-		err := rpctimeout.CallTimeout(nodo, "NodoRaft.AppendEntries", args,
-			&reply, 40*time.Millisecond)
-		if err == nil {
-			if reply.Success {
-				//Actualizar valores de todo
-				nr.NextIndex[i] = nr.NextIndex[i] + len(args.Entries)
-				nr.MatchIndex[i] = nr.NextIndex[i] - 1
-				//La operacion se ha sometido correctamente
-				// Se itera desde el CommitIndex anterior porque se pueden
-				// anyadir mas de una operacion de vez al logger
-				i := nr.CommitIndex + 1
-				match := true
-				for i < len(nr.log) && match {
-					if nr.log[i].Term == nr.CurrentTerm {
-						matchLog := 1
-						for j := range nr.nodos {
-							if nr.MatchIndex[j] >= i {
-								matchLog++
+		if nodo != nil {
+			args := nr.makeAppendEntriesArgs(i)
+			var reply RespuestaAppendEntries
+			err := rpctimeout.CallTimeout(nodo, "NodoRaft.AppendEntries", args,
+				&reply, 40*time.Millisecond)
+			if err == nil {
+				nr.mux.Lock()
+				if reply.Success {
+					//Actualizar valores de todo
+					nr.NextIndex[i] = nr.NextIndex[i] + len(args.Entries)
+					nr.MatchIndex[i] = nr.NextIndex[i] - 1
+					//La operacion se ha sometido correctamente
+					// Se itera desde el CommitIndex anterior porque se pueden
+					// anyadir mas de una operacion de vez al logger
+					i := nr.CommitIndex + 1
+					match := true
+					for i < len(nr.log) && match {
+						if nr.log[i].Term == nr.CurrentTerm {
+							matchLog := 1
+							for j := range nr.nodos {
+								if nr.MatchIndex[j] >= i {
+									matchLog++
+								}
+							}
+							if matchLog*2 > len(nr.nodos)+1 {
+								nr.CommitIndex = i
+								aplica := AplicaOperacion{
+									Indice:    i,
+									Operacion: nr.log[i].Command,
+								}
+								fmt.Println("Se va a someter ", aplica)
+								//nr.CanalAplicar <- aplica
+							} else {
+								match = false
 							}
 						}
-						if matchLog*2 > len(nr.nodos)+1 {
-							nr.CommitIndex = i
-							aplica := AplicaOperacion{
-								Indice:    i,
-								Operacion: nr.log[i].Command,
-							}
-							fmt.Println("Se va a someter ", aplica)
-							//nr.CanalAplicar <- aplica
-						} else {
-							match = false
-						}
+						i++
 					}
-					i++
+				} else {
+					if nr.NextIndex[i] > 0 {
+						nr.NextIndex[i] = nr.NextIndex[i] - 1
+					}
 				}
+				nr.mux.Unlock()
 			} else {
-				if nr.NextIndex[i] > 0 {
-					nr.NextIndex[i] = nr.NextIndex[i] - 1
-				}
+				fmt.Println("Cant reach node ", i, " ", err)
 			}
-
-		} else {
-			fmt.Println("Cant reach node ", i, " ", err)
 		}
 	}
 }

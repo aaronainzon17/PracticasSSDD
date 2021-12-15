@@ -225,10 +225,10 @@ func (cr *CanalResultados) tresOperacionesComprometidasEstable(t *testing.T) {
 	// Poner en marcha  3 réplicas Raft
 	replicasMaquinas :=
 		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
-	cr.startLocalProcesses(replicasMaquinas)
+	//cr.startLocalProcesses(replicasMaquinas)
 	time.Sleep(2 * time.Second)
 	cmds := []string{"op1", "op2", "op3"}
-	for cmd := range cmds {
+	for _, cmd := range cmds {
 		for replica := range replicasMaquinas {
 			rpcConn, err := rpc.DialHTTP("tcp", replica)
 			if err == nil {
@@ -250,6 +250,7 @@ func (cr *CanalResultados) tresOperacionesComprometidasEstable(t *testing.T) {
 				fmt.Println("Connexion error ComprometerOperacionesTest: ", err)
 			}
 		}
+		time.Sleep(2000 * time.Millisecond)
 	}
 
 	// Parar réplicas alamcenamiento en remoto
