@@ -65,7 +65,7 @@ func (os *OpsServer) StopNode(args NrArgs, reply *int) error {
 }
 
 func (os *OpsServer) Submit(args NrArgs, reply *NrReply) error {
-	reply.Indice, reply.Mandato, reply.EsLider = nr.SometerOperacion(args)
+	reply.Indice, reply.Mandato, reply.EsLider = nr.SometerOperacion(args.Operacion)
 	return nil
 }
 
@@ -92,7 +92,7 @@ func main() {
 			index = i
 		}
 	}
-	nr = raft.NuevoNodo(nodos, index, nil)
+	nr = raft.NuevoNodo(nodos, index, make(chan raft.AplicaOperacion))
 	rpc.Register(nr)
 	rpc.HandleHTTP()
 	l, err := net.Listen("tcp", rpcDir)

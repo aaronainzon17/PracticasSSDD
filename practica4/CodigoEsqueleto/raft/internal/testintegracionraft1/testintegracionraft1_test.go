@@ -110,6 +110,12 @@ type NrArgs struct {
 	Operacion interface{}
 }
 
+type NrReply struct {
+	Indice  int
+	Mandato int
+	EsLider bool
+}
+
 // ~/Documents/GitHub/PracticasSSDD/practica4/CodigoEsqueleto/raft/cmd/srvraft
 // ~/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft
 func (cr *CanalResultados) startLocalProcesses(
@@ -186,7 +192,7 @@ func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
 
 // Fallo de un primer lider y reeleccion de uno nuevo
 func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
-	//t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
+	t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
 
 	fmt.Println(t.Name(), ".....................")
 
@@ -212,8 +218,44 @@ func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
 
 // 3 operaciones comprometidas con situacion estable y sin fallos
 func (cr *CanalResultados) tresOperacionesComprometidasEstable(t *testing.T) {
+	//t.Skip("SKIPPED tresOperacionesComprometidasEstable")
 
-	// A completar ???
+	fmt.Println(t.Name(), ".....................")
+
+	// Poner en marcha  3 réplicas Raft
+	replicasMaquinas :=
+		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
+	cr.startLocalProcesses(replicasMaquinas)
+	time.Sleep(2 * time.Second)
+	cmds := []string{"op1", "op2", "op3"}
+	for cmd := range cmds {
+		for replica := range replicasMaquinas {
+			rpcConn, err := rpc.DialHTTP("tcp", replica)
+			if err == nil {
+				var reply string
+				err = rpcConn.Call("OpsServer.NodeState", NrArgs{}, &reply)
+				if err != nil {
+					fmt.Println("No se puede obtener el estado\n", err)
+				}
+				if reply == "leader" {
+					replyOp := someterOperacionTest(NrArgs{Operacion: cmd}, rpcConn)
+					if replyOp.EsLider {
+						fmt.Println("a")
+					} else {
+						fmt.Println("b")
+					}
+				}
+
+			} else {
+				fmt.Println("Connexion error ComprometerOperacionesTest: ", err)
+			}
+		}
+	}
+
+	// Parar réplicas alamcenamiento en remoto
+	cr.stopDistributedProcesses(replicasMaquinas)
+
+	fmt.Println(".............", t.Name(), "Superado")
 }
 
 // --------------------------------------------------------------------------
@@ -291,4 +333,14 @@ func desconectaLider(replicasMaquinas map[string]string) {
 		}
 		i++
 	}
+}
+
+func someterOperacionTest(args NrArgs, rpcConn *rpc.Client) NrReply {
+	var reply NrReply
+	err := rpcConn.Call("OpsServer.Submit", args, &reply)
+	if err != nil {
+		fmt.Println("Couldn't submit operation\n", err)
+		os.Exit(1)
+	}
+	return reply
 }
