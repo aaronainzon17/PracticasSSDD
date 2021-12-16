@@ -55,13 +55,16 @@ func readFile(path string) ([]string, int) {
 
 //func (os *OpsServer) StartNode() {}
 func parar() {
-	time.Sleep(100 * time.Millisecond)
-	nr.Para()
+
 }
 func (os *OpsServer) StopNode(args NrArgs, reply *int) error {
 	fmt.Println("Stopping node")
 	//time.Sleep(2 * time.Second)
-	go parar()
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		nr.Para()
+	}()
+	//go parar()
 	return nil
 }
 
@@ -103,8 +106,6 @@ func main() {
 		fmt.Println("Listen error:", err)
 	}
 	go nr.ConnectNodes(nodos)
-	fmt.Println("Conexion entre nodos correcta")
-	fmt.Println("Soy ", nr.StateNode)
 	http.Serve(l, nil)
 
 }

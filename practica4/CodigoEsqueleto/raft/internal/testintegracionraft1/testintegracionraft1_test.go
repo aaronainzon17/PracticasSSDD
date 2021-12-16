@@ -24,15 +24,15 @@ var REPLICACMD = "cd ~/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft; go run
 
 const (
 	//hosts
-	MAQUINA_LOCAL = "127.0.0.1"
-	MAQUINA1      = "127.0.0.1"
-	MAQUINA2      = "127.0.0.1"
-	MAQUINA3      = "127.0.0.1"
+	MAQUINA_LOCAL = "155.210.154.198"
+	MAQUINA1      = "155.210.154.193"
+	MAQUINA2      = "155.210.154.194"
+	MAQUINA3      = "155.210.154.195"
 
 	//puertos
-	PUERTOREPLICA1 = "29001"
-	PUERTOREPLICA2 = "29002"
-	PUERTOREPLICA3 = "29003"
+	PUERTOREPLICA1 = "29030"
+	PUERTOREPLICA2 = "29030"
+	PUERTOREPLICA3 = "29030"
 
 	//nodos replicas
 	REPLICA1 = MAQUINA1 + ":" + PUERTOREPLICA1
@@ -63,7 +63,7 @@ func TestPrimerasPruebas(t *testing.T) { // (m *testing.M) {
 	// Test1 : No debería haber ningun primario, si SV no ha recibido aún latidos
 	t.Run("T1:ElegirPrimerLider",
 		func(t *testing.T) { cr.soloArranqueYparadaTest1(t) })
-
+	time.Sleep(2 * time.Second)
 	// Test2 : No debería haber ningun primario, si SV no ha recibido aún latidos
 	t.Run("T1:ElegirPrimerLider",
 		func(t *testing.T) { cr.ElegirPrimerLiderTest2(t) })
@@ -117,10 +117,10 @@ func runCmd(cmd string, client string, s *ssh.ClientConfig) error {
 	defer session.Close()
 
 	// run command and capture stdout/stderr
-	salida, err := session.CombinedOutput(cmd)
+	_, err = session.CombinedOutput(cmd)
 	session.Close()
 	conn.Close()
-	fmt.Println(string(salida))
+	//fmt.Println(string(salida))
 	return err
 }
 
@@ -139,8 +139,8 @@ func sshWorkerUp(worker string, hostUser string, remoteUser string) {
 		},
 	}
 	res1 := strings.Split(worker, ":")
-	cmd := "cd /home/a779088/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft;" +
-		"/usr/local/go/bin/go run main.go " + worker + " > /dev/null 2>&1 &"
+	cmd := "cd /home/a779088/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft &&" +
+		" ./main " + worker + " &" //> /dev/null 2>&1
 	fmt.Println(cmd)
 	err = runCmd(cmd, res1[0], config)
 	checkError(err)
@@ -172,7 +172,7 @@ func (cr *CanalResultados) startLocalProcesses(
 
 	for replica := range replicasMaquinas {
 		route := "cd /home/aaron/Documents/GitHub/PracticasSSDD/practica4/CodigoEsqueleto/raft/cmd/srvraft"
-		gorun := "go run main.go " + replica + " &"
+		gorun := "go run main.go " + replica + " > /dev/null 2>&1 &"
 		cmd := exec.Command("/bin/bash", "-c", route+";"+gorun)
 		err := cmd.Run()
 		if err != nil {
@@ -214,7 +214,7 @@ func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
 		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
 	cr.startDistributedProcesses(replicasMaquinas)
 	//cr.startLocalProcesses(replicasMaquinas)
-	time.Sleep(2 * time.Second)
+	time.Sleep(6 * time.Second)
 	// Parar réplicas alamcenamiento en remoto
 	cr.stopDistributedProcesses(replicasMaquinas)
 
@@ -223,7 +223,7 @@ func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
 
 // Primer lider en marcha
 func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
-	t.Skip("SKIPPED ElegirPrimerLiderTest2")
+	//t.Skip("SKIPPED ElegirPrimerLiderTest2")
 
 	fmt.Println(t.Name(), ".....................")
 
@@ -231,7 +231,7 @@ func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
 	replicasMaquinas :=
 		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
 	cr.startDistributedProcesses(replicasMaquinas)
-	time.Sleep(2 * time.Second)
+	time.Sleep(6 * time.Second)
 	// Se ha elegido lider ?
 	fmt.Printf("Probando lider en curso\n")
 	pruebaUnLider(replicasMaquinas)
@@ -244,7 +244,7 @@ func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
 
 // Fallo de un primer lider y reeleccion de uno nuevo
 func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
-	t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
+	//t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
 
 	fmt.Println(t.Name(), ".....................")
 
@@ -270,7 +270,7 @@ func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
 
 // 3 operaciones comprometidas con situacion estable y sin fallos
 func (cr *CanalResultados) tresOperacionesComprometidasEstable(t *testing.T) {
-	t.Skip("SKIPPED tresOperacionesComprometidasEstable")
+	//t.Skip("SKIPPED tresOperacionesComprometidasEstable")
 
 	fmt.Println(t.Name(), ".....................")
 

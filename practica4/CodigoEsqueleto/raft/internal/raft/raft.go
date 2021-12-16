@@ -1,5 +1,5 @@
 // Escribir vuestro código de funcionalidad Raft en este fichero
-//
+//scp -r practica4 a779088@hendrix-ssh.cps.unizar.es:~/cuarto
 
 package raft
 
@@ -165,7 +165,8 @@ func NuevoNodo(nodos []string, yo int, canalAplicar chan AplicaOperacion) *NodoR
 }
 
 func (nr *NodoRaft) ConnectNodes(nodes []string) {
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(4 * time.Second)
+	fmt.Println("EMPIEZA CONNECT NODES DE ", nr.yo)
 	for i := 0; i < len(nodes); i++ {
 		if i != nr.yo {
 			rpcConn, err := rpc.DialHTTP("tcp", nodes[i])
