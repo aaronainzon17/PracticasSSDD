@@ -522,46 +522,46 @@ func (nr *NodoRaft) sendHeartBeat() {
 				&reply, 40*time.Millisecond)
 			if err == nil {
 				nr.mux.Lock()
-				if reply.Success {
-					//Actualizar valores de todo
-					nr.NextIndex[i] = nr.NextIndex[i] + len(args.Entries)
-					nr.MatchIndex[i] = nr.NextIndex[i] - 1
-					//La operacion se ha sometido correctamente
-					// Se itera desde el CommitIndex anterior porque se pueden
-					// anyadir mas de una operacion de vez al logger
-					i := nr.CommitIndex + 1
-					match := true
-					for i < len(nr.log) && match {
-						if nr.log[i].Term == nr.CurrentTerm {
-							matchLog := 1
-							for j := range nr.nodos {
-								if nr.MatchIndex[j] >= i {
-									matchLog++
-								}
-							}
-							if matchLog*2 >= len(nr.nodos)+1 {
-								nr.CommitIndex = i
-								aplica := AplicaOperacion{
-									Indice:    i,
-									Operacion: nr.log[i].Command,
-								}
-								fmt.Println("Se va a someter ", aplica)
-								//nr.CanalAplicar <- aplica
-							} else {
-								match = false
-							}
-						}
-						i++
-					}
-				} else {
-					if nr.NextIndex[i] > 0 {
-						nr.NextIndex[i] = nr.NextIndex[i] - 1
-					}
-				}
+				nr.checkReply(reply, i, len(args.Entries))
 				nr.mux.Unlock()
 			} else {
 				fmt.Println("Cant reach node ", i, " ", err)
 			}
+		}
+	}
+}
+
+func (nr *NodoRaft) checkReply(reply RespuestaAppendEntries, i int, lenEntries int) {
+	if reply.Success {
+		nr.NextIndex[i] = nr.NextIndex[i] + lenEntries
+		nr.MatchIndex[i] = nr.NextIndex[i] - 1
+		index := nr.CommitIndex + 1
+		match := true
+		for index < len(nr.log) && match {
+			if nr.log[index].Term == nr.CurrentTerm {
+				matchLog := 1
+				for j := range nr.nodos {
+					if nr.MatchIndex[j] >= index {
+						matchLog++
+					}
+				}
+				if matchLog*2 >= len(nr.nodos)+1 {
+					nr.CommitIndex = index
+					aplica := AplicaOperacion{
+						Indice:    index,
+						Operacion: nr.log[index].Command,
+					}
+					fmt.Println("Se va a someter ", aplica)
+					//nr.CanalAplicar <- aplica
+				} else {
+					match = false
+				}
+			}
+			index++
+		}
+	} else {
+		if nr.NextIndex[i] > 0 {
+			nr.NextIndex[i] = nr.NextIndex[i] - 1
 		}
 	}
 }
@@ -590,12 +590,8 @@ func (nr *NodoRaft) makeAppendEntriesArgs(i int) ArgsAppendEntries {
 	}
 	entries := nr.log[nrIndex:]
 	args := ArgsAppendEntries{
-		Term:         nr.CurrentTerm,
-		LeaderId:     nr.yo,
-		PrevLogIndex: prevLogIndex,
-		PrevLogTerm:  prevLogTerm,
-		Entries:      entries,
-		LeaderCommit: nr.CommitIndex,
+		Term: nr.CurrentTerm, LeaderId: nr.yo, PrevLogIndex: prevLogIndex,
+		PrevLogTerm: prevLogTerm, Entries: entries, LeaderCommit: nr.CommitIndex,
 	}
 	nr.mux.Unlock()
 	return args
