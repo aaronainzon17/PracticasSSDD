@@ -2,13 +2,17 @@ package testintegracionraft1_test
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net"
 	"net/rpc"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"raft/internal/despliegue"
+	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // PATH de los ejecutables de modulo golang de servicio de vistas
@@ -94,20 +98,60 @@ type CanalResultados chan string
 		fmt.Println(s)
 	}
 }*/
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		os.Exit(1)
+	}
+}
+
+func runCmd(cmd string, client string, s *ssh.ClientConfig) error {
+	// open connection
+	conn, err := ssh.Dial("tcp", client+":22", s)
+	checkError(err)
+	defer conn.Close()
+
+	// open session
+	session, err := conn.NewSession()
+	checkError(err)
+	defer session.Close()
+
+	// run command and capture stdout/stderr
+	salida, err := session.CombinedOutput(cmd)
+	session.Close()
+	conn.Close()
+	fmt.Println(string(salida))
+	return err
+}
+
+func sshWorkerUp(worker string, hostUser string, remoteUser string) {
+	pemBytes, err := ioutil.ReadFile("/home/" + hostUser + "/.ssh/id_rsa")
+	checkError(err)
+	signer, err := ssh.ParsePrivateKey(pemBytes)
+	checkError(err)
+
+	config := &ssh.ClientConfig{
+		User: remoteUser,
+		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			// use OpenSSH's known_hosts file if you care about host validation
+			return nil
+		},
+	}
+	res1 := strings.Split(worker, ":")
+	cmd := "cd /home/a779088/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft;" +
+		"/usr/local/go/bin/go run main.go " + worker + " > /dev/null 2>&1 &"
+	fmt.Println(cmd)
+	err = runCmd(cmd, res1[0], config)
+	checkError(err)
+}
 
 // start  gestor de vistas; mapa de replicas y maquinas donde ubicarlos;
 // y lista clientes (host:puerto)
 func (cr *CanalResultados) startDistributedProcesses(
 	replicasMaquinas map[string]string) {
-	cmd := "cd ~/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft; go run main.go "
-
-	for replica, maquina := range replicasMaquinas {
-		despliegue.ExecMutipleHosts(
-			cmd+replica+" > /dev/null 2>&1 &",
-			[]string{maquina}, make(chan string), PRIVKEYFILE)
-
-		// dar tiempo para se establezcan las replicas
-		time.Sleep(1000 * time.Millisecond)
+	for replica := range replicasMaquinas {
+		go sshWorkerUp(replica, "a779088", "a779088")
 	}
 }
 
@@ -127,8 +171,8 @@ func (cr *CanalResultados) startLocalProcesses(
 	replicasMaquinas map[string]string) {
 
 	for replica := range replicasMaquinas {
-		route := "cd ~/Documents/GitHub/PracticasSSDD/practica4/CodigoEsqueleto/raft/cmd/srvraft"
-		gorun := "go run main.go " + replica + " > /dev/null 2>&1 &"
+		route := "cd /home/aaron/Documents/GitHub/PracticasSSDD/practica4/CodigoEsqueleto/raft/cmd/srvraft"
+		gorun := "go run main.go " + replica + " &"
 		cmd := exec.Command("/bin/bash", "-c", route+";"+gorun)
 		err := cmd.Run()
 		if err != nil {
@@ -161,22 +205,25 @@ func (cr *CanalResultados) stopDistributedProcesses(
 
 // Se pone en marcha una replica ??
 func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
-	t.Skip("SKIPPED soloArranqueYparadaTest1")
+	//t.Skip("SKIPPED soloArranqueYparadaTest1")
 
 	fmt.Println(t.Name(), ".....................")
 
-	// Poner en marcha replicas en remoto
-	cr.startDistributedProcesses(map[string]string{REPLICA1: MAQUINA1})
+	// Poner en marcha  3 réplicas Raft
+	replicasMaquinas :=
+		map[string]string{REPLICA1: MAQUINA1, REPLICA2: MAQUINA2, REPLICA3: MAQUINA3}
+	cr.startDistributedProcesses(replicasMaquinas)
+	//cr.startLocalProcesses(replicasMaquinas)
 	time.Sleep(2 * time.Second)
 	// Parar réplicas alamcenamiento en remoto
-	cr.stopDistributedProcesses(map[string]string{REPLICA1: MAQUINA1})
+	cr.stopDistributedProcesses(replicasMaquinas)
 
 	fmt.Println(".............", t.Name(), "Superado")
 }
 
 // Primer lider en marcha
 func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
-	//t.Skip("SKIPPED ElegirPrimerLiderTest2")
+	t.Skip("SKIPPED ElegirPrimerLiderTest2")
 
 	fmt.Println(t.Name(), ".....................")
 
@@ -197,7 +244,7 @@ func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
 
 // Fallo de un primer lider y reeleccion de uno nuevo
 func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
-	//t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
+	t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
 
 	fmt.Println(t.Name(), ".....................")
 
@@ -223,7 +270,7 @@ func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
 
 // 3 operaciones comprometidas con situacion estable y sin fallos
 func (cr *CanalResultados) tresOperacionesComprometidasEstable(t *testing.T) {
-	//t.Skip("SKIPPED tresOperacionesComprometidasEstable")
+	t.Skip("SKIPPED tresOperacionesComprometidasEstable")
 
 	fmt.Println(t.Name(), ".....................")
 

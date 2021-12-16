@@ -165,6 +165,7 @@ func NuevoNodo(nodos []string, yo int, canalAplicar chan AplicaOperacion) *NodoR
 }
 
 func (nr *NodoRaft) ConnectNodes(nodes []string) {
+	time.Sleep(500 * time.Millisecond)
 	for i := 0; i < len(nodes); i++ {
 		if i != nr.yo {
 			rpcConn, err := rpc.DialHTTP("tcp", nodes[i])

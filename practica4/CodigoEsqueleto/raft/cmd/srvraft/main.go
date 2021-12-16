@@ -60,7 +60,7 @@ func parar() {
 }
 func (os *OpsServer) StopNode(args NrArgs, reply *int) error {
 	fmt.Println("Stopping node")
-	time.Sleep(2 * time.Second)
+	//time.Sleep(2 * time.Second)
 	go parar()
 	return nil
 }
@@ -102,7 +102,6 @@ func main() {
 	if err != nil {
 		fmt.Println("Listen error:", err)
 	}
-	time.Sleep(4 * time.Second)
 	go nr.ConnectNodes(nodos)
 	fmt.Println("Conexion entre nodos correcta")
 	fmt.Println("Soy ", nr.StateNode)
