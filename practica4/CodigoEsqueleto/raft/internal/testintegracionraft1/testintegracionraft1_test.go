@@ -326,13 +326,11 @@ func pruebaUnLider(replicasMaquinas map[string]string) int {
 				if reply == "leader" {
 					mapaLideres[iters] = append(mapaLideres[iters], i)
 				}
-
 			} else {
 				fmt.Println("pruebaUnLider conn err: ", err)
 			}
 			i++
 		}
-
 		ultimoMandatoConLider := -1
 		for t, lideres := range mapaLideres {
 			if len(lideres) > 1 {
@@ -342,11 +340,8 @@ func pruebaUnLider(replicasMaquinas map[string]string) int {
 				ultimoMandatoConLider = t
 			}
 		}
-
 		if len(mapaLideres) != 0 {
-
 			return mapaLideres[ultimoMandatoConLider][0] // Termina
-
 		}
 	}
 	fmt.Println("un lider esperado, ninguno obtenido")

@@ -54,9 +54,7 @@ func readFile(path string) ([]string, int) {
 }
 
 //func (os *OpsServer) StartNode() {}
-func parar() {
 
-}
 func (os *OpsServer) StopNode(args NrArgs, reply *int) error {
 	fmt.Println("Stopping node")
 	//time.Sleep(2 * time.Second)
@@ -64,7 +62,6 @@ func (os *OpsServer) StopNode(args NrArgs, reply *int) error {
 		time.Sleep(100 * time.Millisecond)
 		nr.Para()
 	}()
-	//go parar()
 	return nil
 }
 

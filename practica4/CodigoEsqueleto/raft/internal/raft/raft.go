@@ -437,29 +437,32 @@ func (nr *NodoRaft) elecciones() {
 	nr.VotedFor = nr.yo
 	nr.electionResetEvent = time.Now()
 
-	votos := nr.hacerElecciones(nr.CurrentTerm)
-
-	// votos >= (N + 1)/2
-	if votos*2 >= len(nr.nodos)+1 {
-		// Gana la eleccion y se convierte en lider
-		fmt.Println("HE GANADO CON ", votos, " VOTOS")
-		go nr.becomeLeader(nr.CurrentTerm)
-	} else {
-		nr.mux.Lock()
-		nr.becomeFollower(nr.CurrentTerm - 1)
-		nr.mux.Unlock()
+	votos, exito := nr.hacerElecciones(nr.CurrentTerm)
+	if exito {
+		// votos >= (N + 1)/2
+		if votos*2 >= len(nr.nodos)+1 {
+			// Gana la eleccion y se convierte en lider
+			fmt.Println("HE GANADO CON ", votos, " VOTOS")
+			go nr.becomeLeader(nr.CurrentTerm)
+		} else {
+			nr.mux.Lock()
+			nr.becomeFollower(nr.CurrentTerm - 1)
+			nr.mux.Unlock()
+		}
 	}
+
 }
 
-func (nr *NodoRaft) hacerElecciones(storedTerm int) int {
+func (nr *NodoRaft) hacerElecciones(storedTerm int) (int, bool) {
 	votos := 1
-	//RequestVote RPCs in parallel to each of the other servers in the cluster.
+	exito := true
 	for _, nodo := range nr.nodos {
 		if nodo != nil {
 			// Si ha llegado una llamada de un lider y ha cambiado a seguidor
 			// se detiene la votacion
 			if nr.StateNode != C {
 				fmt.Println("Estoy en elecciones y no soy candidato ME VOY")
+				exito = false
 				break
 			}
 			nr.mux.Lock()
@@ -472,6 +475,7 @@ func (nr *NodoRaft) hacerElecciones(storedTerm int) int {
 			if res := nr.enviarPeticionVoto(nodo, &args, &reply); res {
 				if storedTerm < reply.Term {
 					nr.becomeFollower(reply.Term)
+					exito = false
 					break
 				}
 				if (reply.Term == storedTerm) && reply.VoteGranted {
@@ -480,7 +484,7 @@ func (nr *NodoRaft) hacerElecciones(storedTerm int) int {
 			}
 		}
 	}
-	return votos
+	return votos, exito
 }
 
 // Function to change a node's state to follower
