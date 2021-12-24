@@ -25,9 +25,9 @@ var REPLICACMD = "cd ~/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft; go run
 const (
 	//hosts
 	MAQUINA_LOCAL = "155.210.154.198"
-	MAQUINA1      = "155.210.154.193"
-	MAQUINA2      = "155.210.154.194"
-	MAQUINA3      = "155.210.154.195"
+	MAQUINA1      = "155.210.154.196"
+	MAQUINA2      = "155.210.154.197"
+	MAQUINA3      = "155.210.154.199"
 
 	//puertos
 	PUERTOREPLICA1 = "29030"
