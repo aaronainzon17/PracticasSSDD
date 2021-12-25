@@ -24,15 +24,15 @@ var REPLICACMD = "cd ~/cuarto/practica4/CodigoEsqueleto/raft/cmd/srvraft; go run
 
 const (
 	//hosts
-	MAQUINA_LOCAL = "155.210.154.198"
-	MAQUINA1      = "155.210.154.196"
-	MAQUINA2      = "155.210.154.197"
-	MAQUINA3      = "155.210.154.199"
+	MAQUINA_LOCAL = "127.0.0.1"
+	MAQUINA1      = "127.0.0.1"
+	MAQUINA2      = "127.0.0.1"
+	MAQUINA3      = "127.0.0.1"
 
 	//puertos
 	PUERTOREPLICA1 = "29030"
-	PUERTOREPLICA2 = "29030"
-	PUERTOREPLICA3 = "29030"
+	PUERTOREPLICA2 = "29031"
+	PUERTOREPLICA3 = "29032"
 
 	//nodos replicas
 	REPLICA1 = MAQUINA1 + ":" + PUERTOREPLICA1
@@ -205,7 +205,7 @@ func (cr *CanalResultados) stopDistributedProcesses(
 
 // Se pone en marcha una replica ??
 func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
-	//t.Skip("SKIPPED soloArranqueYparadaTest1")
+	t.Skip("SKIPPED soloArranqueYparadaTest1")
 
 	fmt.Println(t.Name(), ".....................")
 
@@ -223,7 +223,7 @@ func (cr *CanalResultados) soloArranqueYparadaTest1(t *testing.T) {
 
 // Primer lider en marcha
 func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
-	//t.Skip("SKIPPED ElegirPrimerLiderTest2")
+	t.Skip("SKIPPED ElegirPrimerLiderTest2")
 
 	fmt.Println(t.Name(), ".....................")
 
@@ -244,7 +244,7 @@ func (cr *CanalResultados) ElegirPrimerLiderTest2(t *testing.T) {
 
 // Fallo de un primer lider y reeleccion de uno nuevo
 func (cr *CanalResultados) FalloAnteriorElegirNuevoLiderTest3(t *testing.T) {
-	//t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
+	t.Skip("SKIPPED FalloAnteriorElegirNuevoLiderTest3")
 
 	fmt.Println(t.Name(), ".....................")
 

@@ -240,6 +240,11 @@ func (nr *NodoRaft) SometerOperacion(operacion interface{}) (int, int, bool) {
 		indice = nr.NextIndex[nr.yo]
 		mandato = nr.CurrentTerm
 		EsLider = true
+		for i, nodo := range nr.nodos {
+			if nodo != nil {
+				go nr.submit(nodo, i)
+			}
+		}
 	}
 	nr.mux.Unlock()
 
@@ -445,9 +450,7 @@ func (nr *NodoRaft) elecciones() {
 			fmt.Println("HE GANADO CON ", votos, " VOTOS")
 			go nr.becomeLeader(nr.CurrentTerm)
 		} else {
-			nr.mux.Lock()
-			nr.becomeFollower(nr.CurrentTerm - 1)
-			nr.mux.Unlock()
+			go nr.gestionDeLider()
 		}
 	}
 
@@ -517,56 +520,72 @@ func (nr *NodoRaft) becomeLeader(term int) {
 }
 
 //Funcion encargada de enviar latidos a todos los nodos
+func (nr *NodoRaft) submit(nodo *rpc.Client, i int) {
+	done := false
+	for !done {
+		args := nr.makeAppendEntriesArgs(i)
+		var reply RespuestaAppendEntries
+		err := rpctimeout.CallTimeout(nodo, "NodoRaft.AppendEntries", args,
+			&reply, 40*time.Millisecond)
+		if err == nil {
+			nr.mux.Lock()
+			if reply.Success {
+				nr.checkReply(reply, i, len(args.Entries))
+				done = true
+			} else {
+				if nr.NextIndex[i] > 0 {
+					nr.NextIndex[i] = nr.NextIndex[i] - 1
+				}
+			}
+			nr.mux.Unlock()
+
+		} else {
+			fmt.Println("Cant reach node ", i, " ", err)
+		}
+	}
+}
+
+//Funcion encargada de enviar latidos a todos los nodos
 func (nr *NodoRaft) sendHeartBeat() {
 	for i, nodo := range nr.nodos {
 		if nodo != nil {
-			args := nr.makeAppendEntriesArgs(i)
+			args := ArgsAppendEntries{Term: nr.CurrentTerm, LeaderId: nr.yo}
 			var reply RespuestaAppendEntries
 			err := rpctimeout.CallTimeout(nodo, "NodoRaft.AppendEntries", args,
-				&reply, 40*time.Millisecond)
-			if err == nil {
-				nr.mux.Lock()
-				nr.checkReply(reply, i, len(args.Entries))
-				nr.mux.Unlock()
-			} else {
-				fmt.Println("Cant reach node ", i, " ", err)
+				&reply, 5*time.Second)
+			if err != nil {
+				fmt.Println("Cant reach node ", i)
 			}
 		}
 	}
 }
 
 func (nr *NodoRaft) checkReply(reply RespuestaAppendEntries, i int, lenEntries int) {
-	if reply.Success {
-		nr.NextIndex[i] = nr.NextIndex[i] + lenEntries
-		nr.MatchIndex[i] = nr.NextIndex[i] - 1
-		index := nr.CommitIndex + 1
-		match := true
-		for index < len(nr.log) && match {
-			if nr.log[index].Term == nr.CurrentTerm {
-				matchLog := 1
-				for j := range nr.nodos {
-					if nr.MatchIndex[j] >= index {
-						matchLog++
-					}
-				}
-				if matchLog*2 >= len(nr.nodos)+1 {
-					nr.CommitIndex = index
-					aplica := AplicaOperacion{
-						Indice:    index,
-						Operacion: nr.log[index].Command,
-					}
-					fmt.Println("Se va a someter ", aplica)
-					//nr.CanalAplicar <- aplica
-				} else {
-					match = false
+	nr.NextIndex[i] = nr.NextIndex[i] + lenEntries
+	nr.MatchIndex[i] = nr.NextIndex[i] - 1
+	index := nr.CommitIndex + 1
+	match := true
+	for index < len(nr.log) && match {
+		if nr.log[index].Term == nr.CurrentTerm {
+			matchLog := 1
+			for j := range nr.nodos {
+				if nr.MatchIndex[j] >= index {
+					matchLog++
 				}
 			}
-			index++
+			if matchLog*2 >= len(nr.nodos)+1 {
+				nr.CommitIndex = index
+				aplica := AplicaOperacion{
+					Indice:    index,
+					Operacion: nr.log[index].Command,
+				}
+				fmt.Println("Se va a someter ", aplica)
+				//nr.CanalAplicar <- aplica
+			} else {
+				match = false
+			}
 		}
-	} else {
-		if nr.NextIndex[i] > 0 {
-			nr.NextIndex[i] = nr.NextIndex[i] - 1
-		}
+		index++
 	}
 }
 
