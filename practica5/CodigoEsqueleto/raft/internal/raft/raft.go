@@ -438,6 +438,7 @@ func (nr *NodoRaft) enviarPeticionVoto(nodo int, args *ArgsPeticionVoto,
 	return ok
 }
 
+//----------------------------------------------------------------------------
 //FUNCIONES ASOCIADAS A ESTADOS
 
 /********************			 SEGUIDOR			***************************
