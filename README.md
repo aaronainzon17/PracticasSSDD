@@ -8,9 +8,8 @@ Arquitecturas cliente servidor y master worker
 Gestion de concurrencia y relojes logicos (Ricart-Agrawala)
 
 # Practica 3
-
+Tolerancia a fallos en Servidores Sin Estado
 # Practica 4
-
+Implementacion de Raft como algoritmo de consenso distrubuido
 # Practica 5
-
-# Practica 6
+Implementacion de servicio de almacenamiento clave/valor, en memoria RAM, tolerante a fallos utilizando replicación distribuida basada en Raft
