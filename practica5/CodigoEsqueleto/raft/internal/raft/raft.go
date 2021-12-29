@@ -232,7 +232,8 @@ func (nr *NodoRaft) someterOperacion(operacion TipoOperacion) (int, int,
 	// Vuestro codigo aqui
 	nr.Mux.Lock()
 	if nr.StateNode == L {
-		nr.log = append(nr.log, LogEntry{operacion, nr.CurrentTerm})
+		nr.log = append(nr.log, LogEntry{operacion.Operacion, nr.CurrentTerm})
+		fmt.Println(nr.log)
 		indice = nr.NextIndex[nr.Yo]
 		mandato = nr.CurrentTerm
 		EsLider = true
@@ -373,10 +374,11 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 		if args.PrevLogIndex == IntNOINICIALIZADO || (len(nr.log) > args.PrevLogIndex &&
 			nr.log[args.PrevLogIndex].Term == args.PrevLogTerm) {
 			results.Success = true
-			// Como en P4 no hay errores se obvian las comprobaciones
-			//Faltan comprobaciones aunque son P5
-			nr.log = append(nr.log, args.Entries...)
 			if len(args.Entries) > 0 {
+				//Se puede hacer un bucle para comprobar el punto de insercion
+				fmt.Println("Voy a ver que hay hasta args.PrevLogIndex+1", args.PrevLogIndex+1)
+				fmt.Println(nr.log[:args.PrevLogIndex+1])
+				nr.log = append(nr.log[:args.PrevLogIndex+1], args.Entries...)
 				fmt.Println("Se ha almacenado una op en el LOG")
 				fmt.Println(nr.log)
 			}
@@ -610,6 +612,7 @@ func (nr *NodoRaft) submit(i int) {
 				done = true
 			} else {
 				if nr.NextIndex[i] > 0 {
+					fmt.Println("ALGO NO COINCIDE CAPITAN")
 					nr.NextIndex[i] = nr.NextIndex[i] - 1
 				}
 			}
@@ -622,7 +625,10 @@ func (nr *NodoRaft) submit(i int) {
 }
 
 func (nr *NodoRaft) checkReply(reply Results, i int, lenEntries int) {
+	fmt.Println("Voy a actualizar nextIndex de ", i)
+	fmt.Println("NextIndex ini: ", nr.NextIndex[i])
 	nr.NextIndex[i] = nr.NextIndex[i] + lenEntries
+	fmt.Println("NextIndex fin: ", nr.NextIndex[i])
 	nr.MatchIndex[i] = nr.NextIndex[i] - 1
 	index := nr.CommitIndex + 1
 	match := true
@@ -655,7 +661,7 @@ func (nr *NodoRaft) makeAppendEntriesArgs(i int) ArgAppendEntries {
 	nr.Mux.Lock()
 	var prevLogIndex, prevLogTerm int
 	nrIndex := nr.NextIndex[i]
-	if nrIndex-1 > 0 {
+	if nrIndex-1 >= 0 {
 		prevLogIndex = nrIndex - 1
 		prevLogTerm = nr.log[prevLogIndex].Term
 	} else {
