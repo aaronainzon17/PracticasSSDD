@@ -331,7 +331,7 @@ func (nr *NodoRaft) PedirVoto(peticion *ArgsPeticionVoto,
 	if nr.CurrentTerm == peticion.Term &&
 		(nr.VotedFor == IntNOINICIALIZADO || nr.VotedFor == peticion.CandidateId) &&
 		(peticion.LastLogIndex >= lastLogIndex &&
-			peticion.LastLogTerm == lastLogTerm) {
+			peticion.LastLogTerm == lastLogTerm || lastLogTerm == -1) {
 		reply.VoteGranted = true
 		nr.VotedFor = peticion.CandidateId
 		nr.electionResetEvent = time.Now()
@@ -516,7 +516,7 @@ func (nr *NodoRaft) sendHeartBeat() {
 			err := nr.Nodos[i].CallTimeout("NodoRaft.AppendEntries", args,
 				&reply, 5*time.Second)
 			if err != nil {
-				fmt.Println("Cant reach node ", i)
+				//fmt.Println("Cant reach node ", i)
 			}
 		}
 	}
@@ -608,7 +608,7 @@ func (nr *NodoRaft) submit(i int) {
 		if err == nil {
 			nr.Mux.Lock()
 			if reply.Success {
-				nr.checkReply(reply, i, len(args.Entries))
+				nr.checkReply(i, len(args.Entries), args.PrevLogIndex+1)
 				done = true
 			} else {
 				if nr.NextIndex[i] > 0 {
@@ -620,14 +620,15 @@ func (nr *NodoRaft) submit(i int) {
 
 		} else {
 			fmt.Println("Cant reach node ", i, " ", err)
+			done = true
 		}
 	}
 }
 
-func (nr *NodoRaft) checkReply(reply Results, i int, lenEntries int) {
+func (nr *NodoRaft) checkReply(i int, lenEntries int, ni int) {
 	fmt.Println("Voy a actualizar nextIndex de ", i)
 	fmt.Println("NextIndex ini: ", nr.NextIndex[i])
-	nr.NextIndex[i] = nr.NextIndex[i] + lenEntries
+	nr.NextIndex[i] = ni + lenEntries
 	fmt.Println("NextIndex fin: ", nr.NextIndex[i])
 	nr.MatchIndex[i] = nr.NextIndex[i] - 1
 	index := nr.CommitIndex + 1
