@@ -110,7 +110,7 @@ type State struct {
 }
 
 type LogEntry struct {
-	Command interface{}
+	Command TipoOperacion
 	Term    int
 }
 
@@ -232,7 +232,7 @@ func (nr *NodoRaft) someterOperacion(operacion TipoOperacion) (int, int,
 	// Vuestro codigo aqui
 	nr.Mux.Lock()
 	if nr.StateNode == L {
-		nr.log = append(nr.log, LogEntry{operacion.Operacion, nr.CurrentTerm})
+		nr.log = append(nr.log, LogEntry{operacion, nr.CurrentTerm})
 		fmt.Println(nr.log)
 		indice = nr.NextIndex[nr.Yo]
 		mandato = nr.CurrentTerm
@@ -255,6 +255,7 @@ func (nr *NodoRaft) someterOperacion(operacion TipoOperacion) (int, int,
 type Vacio struct{}
 
 func (nr *NodoRaft) ParaNodo(args Vacio, reply *Vacio) error {
+	fmt.Println("El commitIndex es: ", nr.CommitIndex)
 	defer nr.para()
 	return nil
 }
@@ -384,8 +385,10 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 			}
 		}
 		//Si se ha actualizado el CommitIndex del lider y mi logger tambien => actualizo mi commit index
-		if args.LeaderCommit > nr.CommitIndex && args.LeaderCommit == len(nr.log) {
-			nr.CommitIndex = args.LeaderCommit
+		if args.LeaderCommit > nr.CommitIndex {
+			fmt.Println("Voy a replicar el almacen del lider")
+			go nr.replicarAlmacen(args.LeaderCommit)
+
 		}
 		results.Term = nr.CurrentTerm
 	}
@@ -511,12 +514,12 @@ func (nr *NodoRaft) becomeLeader(term int) {
 func (nr *NodoRaft) sendHeartBeat() {
 	for i := range nr.Nodos {
 		if i != nr.Yo {
-			args := ArgAppendEntries{Term: nr.CurrentTerm, LeaderId: nr.Yo}
+			args := ArgAppendEntries{Term: nr.CurrentTerm, LeaderId: nr.Yo, LeaderCommit: nr.CommitIndex}
 			var reply Results
 			err := nr.Nodos[i].CallTimeout("NodoRaft.AppendEntries", args,
-				&reply, 5*time.Second)
+				&reply, 50*time.Millisecond)
 			if err != nil {
-				//fmt.Println("Cant reach node ", i)
+				fmt.Println("Cant reach node ", i)
 			}
 		}
 	}
@@ -608,7 +611,7 @@ func (nr *NodoRaft) submit(i int) {
 		if err == nil {
 			nr.Mux.Lock()
 			if reply.Success {
-				nr.checkReply(i, len(args.Entries), args.PrevLogIndex+1)
+				nr.checkReply(i, args.Entries, args.PrevLogIndex+1)
 				done = true
 			} else {
 				if nr.NextIndex[i] > 0 {
@@ -618,17 +621,17 @@ func (nr *NodoRaft) submit(i int) {
 			}
 			nr.Mux.Unlock()
 
-		} else {
+		} /*else {
 			fmt.Println("Cant reach node ", i, " ", err)
 			done = true
-		}
+		}*/
 	}
 }
 
-func (nr *NodoRaft) checkReply(i int, lenEntries int, ni int) {
+func (nr *NodoRaft) checkReply(i int, Entries []LogEntry, ni int) {
 	fmt.Println("Voy a actualizar nextIndex de ", i)
 	fmt.Println("NextIndex ini: ", nr.NextIndex[i])
-	nr.NextIndex[i] = ni + lenEntries
+	nr.NextIndex[i] = ni + len(Entries)
 	fmt.Println("NextIndex fin: ", nr.NextIndex[i])
 	nr.MatchIndex[i] = nr.NextIndex[i] - 1
 	index := nr.CommitIndex + 1
@@ -643,13 +646,13 @@ func (nr *NodoRaft) checkReply(i int, lenEntries int, ni int) {
 			}
 			if matchLog*2 >= len(nr.Nodos)+1 {
 				nr.CommitIndex = index
-				/*NO SE SI HACE FALTA
+				//NO SE SI HACE FALTA
 				aplica := AplicaOperacion{
 					Indice:    index,
 					Operacion: nr.log[index].Command,
 				}
-				fmt.Println("Se va a someter ", aplica)
-				nr.CanalAplicar <- aplica*/
+				fmt.Println("Se va a alamcenar en RAM ", aplica)
+				nr.CanalAplicar <- aplica
 			} else {
 				match = false
 			}
@@ -676,4 +679,33 @@ func (nr *NodoRaft) makeAppendEntriesArgs(i int) ArgAppendEntries {
 	}
 	nr.Mux.Unlock()
 	return args
+}
+
+func (nr *NodoRaft) CheckCommits(args int, reply *bool) error {
+	nr.Mux.Lock()
+	defer nr.Mux.Unlock()
+	*reply = false
+	if nr.CommitIndex == args {
+		*reply = true
+	}
+	return nil
+}
+
+func (nr *NodoRaft) replicarAlmacen(leaderCommit int) {
+	nr.Mux.Lock()
+	ni := nr.CommitIndex + 1
+	nr.Mux.Unlock()
+	fmt.Println("Mi nr.CommitIndex: ", ni, " el LeaderCommit: ", leaderCommit)
+	for i := ni; i <= leaderCommit; i++ {
+		aplica := AplicaOperacion{
+			Indice:    i,
+			Operacion: nr.log[i].Command,
+		}
+		fmt.Println("Se va a alamcenar en RAM ", aplica)
+		nr.CanalAplicar <- aplica
+
+	}
+	nr.Mux.Lock()
+	nr.CommitIndex = leaderCommit
+	nr.Mux.Unlock()
 }
