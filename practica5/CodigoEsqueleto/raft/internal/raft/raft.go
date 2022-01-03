@@ -387,8 +387,12 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 		//Si se ha actualizado el CommitIndex del lider y mi logger tambien => actualizo mi commit index
 		if args.LeaderCommit > nr.CommitIndex {
 			fmt.Println("Voy a replicar el almacen del lider")
-			go nr.replicarAlmacen(args.LeaderCommit)
-
+			//Como se replica el logger si mi logger por algun casual no es igual o mas largo
+			//que el leader commit no voy a poder replicarlo porque no tengo de donde sacar las
+			//entradas
+			if len(nr.log) >= args.LeaderCommit {
+				go nr.replicarAlmacen(args.LeaderCommit)
+			}
 		}
 		results.Term = nr.CurrentTerm
 	}
@@ -694,9 +698,11 @@ func (nr *NodoRaft) CheckCommits(args int, reply *bool) error {
 func (nr *NodoRaft) replicarAlmacen(leaderCommit int) {
 	nr.Mux.Lock()
 	ni := nr.CommitIndex + 1
+	nr.CommitIndex = leaderCommit
 	nr.Mux.Unlock()
 	fmt.Println("Mi nr.CommitIndex: ", ni, " el LeaderCommit: ", leaderCommit)
 	for i := ni; i <= leaderCommit; i++ {
+		fmt.Println("Mi op del logger: ", i, ":", nr.log[i].Command)
 		aplica := AplicaOperacion{
 			Indice:    i,
 			Operacion: nr.log[i].Command,
@@ -705,7 +711,4 @@ func (nr *NodoRaft) replicarAlmacen(leaderCommit int) {
 		nr.CanalAplicar <- aplica
 
 	}
-	nr.Mux.Lock()
-	nr.CommitIndex = leaderCommit
-	nr.Mux.Unlock()
 }

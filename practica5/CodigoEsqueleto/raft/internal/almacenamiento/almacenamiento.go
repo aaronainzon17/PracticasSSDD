@@ -31,12 +31,6 @@ func (al *Almacen) Escribir(clave string, valor string) {
 	al.DB[clave] = valor
 }
 
-func (al *Almacen) HasData() bool {
-	al.Mux.Lock()
-	defer al.Mux.Unlock()
-	return len(al.DB) > 0
-}
-
 func (al *Almacen) gestionAlmacen(op raft.TipoOperacion) {
 	if op.Operacion == "leer" {
 		al.Leer(op.Clave)
