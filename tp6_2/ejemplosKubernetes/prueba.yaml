@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prueba1
+  labels:
+    app: prueba1
+data:
+  primary.cnf: |
+    # Apply this config only on the primary.  
+  replica.cnf: |
+    # Apply this config only on replicas.
