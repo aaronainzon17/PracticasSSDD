@@ -13,14 +13,17 @@ import (
 	"raft/internal/comun/rpctimeout"
 	"raft/internal/raft"
 	"strconv"
+	"strings"
 	//"time"
 )
 
 func main() {
 	// obtener entero de indice de este nodo
-	me, err := strconv.Atoi(os.Args[1])
+	meIni := os.Args[1]
+	me1 := strings.Split(meIni, "-")
+	meIni = me1[1]
+	me, err := strconv.Atoi(meIni)
 	check.CheckError(err, "Main, mal numero entero de indice de nodo:")
-
 	var nodos []rpctimeout.HostPort
 	// Resto de argumento son los end points como strings
 	// De todas la replicas-> pasarlos a HostPort

@@ -35,8 +35,18 @@ spec:
       containers:
       - name: raft
         image: localhost:5000/raft:latest
+        env:
+        - name: MISUBDOMINIODNS
+          value: raftdns.default.svc.cluster.local
+        - name: MINOMBREPOD		# primera replica r-0, segunda r-1, etc
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         command:
-        - sleep
-        - "3600"
+        - nodoraft
+        - $(MINOMBREPOD)
+        - nodoraft-0.raftdns.default.svc.cluster.local:6000 
+        - nodoraft-1.raftdns.default.svc.cluster.local:6000 
+        - nodoraft-2.raftdns.default.svc.cluster.local:6000
         ports:
         - containerPort: 6000
