@@ -322,6 +322,7 @@ type RespuestaPeticionVoto struct {
 func (nr *NodoRaft) PedirVoto(peticion *ArgsPeticionVoto,
 	reply *RespuestaPeticionVoto) error {
 	nr.Mux.Lock()
+	defer nr.Mux.Unlock()
 	lastLogIndex, lastLogTerm := nr.getLastLogData()
 	if peticion.Term > nr.CurrentTerm {
 		nr.becomeFollower(peticion.Term)
@@ -331,8 +332,8 @@ func (nr *NodoRaft) PedirVoto(peticion *ArgsPeticionVoto,
 	}
 	if nr.CurrentTerm == peticion.Term &&
 		(nr.VotedFor == IntNOINICIALIZADO || nr.VotedFor == peticion.CandidateId) &&
-		(peticion.LastLogIndex >= lastLogIndex &&
-			peticion.LastLogTerm == lastLogTerm || lastLogTerm == -1) {
+		((peticion.LastLogIndex >= lastLogIndex &&
+			peticion.LastLogTerm == lastLogTerm) || peticion.LastLogTerm > lastLogTerm) {
 		reply.VoteGranted = true
 		nr.VotedFor = peticion.CandidateId
 		nr.electionResetEvent = time.Now()
@@ -340,7 +341,6 @@ func (nr *NodoRaft) PedirVoto(peticion *ArgsPeticionVoto,
 		reply.VoteGranted = false
 	}
 	reply.Term = nr.CurrentTerm
-	nr.Mux.Unlock()
 
 	return nil
 }
@@ -371,6 +371,9 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 	//Si el mandato es menor rechaza la peticion
 	results.Success = false
 	if args.Term == nr.CurrentTerm {
+		if nr.StateNode != F {
+			nr.becomeFollower(args.Term)
+		}
 		nr.electionResetEvent = time.Now()
 		if args.PrevLogIndex == IntNOINICIALIZADO || (len(nr.log) > args.PrevLogIndex &&
 			nr.log[args.PrevLogIndex].Term == args.PrevLogTerm) {
@@ -455,6 +458,10 @@ func (nr *NodoRaft) enviarPeticionVoto(nodo int, args *ArgsPeticionVoto,
 * si no se reciben mensajes de nadie durante un tiempo.
 **/
 func (nr *NodoRaft) gestionDeLider() {
+	nr.Mux.Lock()
+	nr.VotedFor = IntNOINICIALIZADO
+	nr.StateNode = F
+	nr.Mux.Unlock()
 	// Uso una semilla porque sino genera la misma secuencia de
 	// numeros aleatorios para todos
 	s1 := rand.NewSource(time.Now().UnixNano())
@@ -483,6 +490,7 @@ func (nr *NodoRaft) gestionDeLider() {
 * por parametro
 **/
 func (nr *NodoRaft) becomeFollower(term int) {
+	fmt.Println("SEGUIDOR DEL MANDATO: ", term)
 	nr.StateNode = F
 	nr.CurrentTerm = term
 	nr.VotedFor = IntNOINICIALIZADO
