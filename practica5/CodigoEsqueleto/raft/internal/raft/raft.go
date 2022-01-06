@@ -322,6 +322,7 @@ type RespuestaPeticionVoto struct {
 func (nr *NodoRaft) PedirVoto(peticion *ArgsPeticionVoto,
 	reply *RespuestaPeticionVoto) error {
 	nr.Mux.Lock()
+	defer nr.Mux.Unlock()
 	lastLogIndex, lastLogTerm := nr.getLastLogData()
 	if peticion.Term > nr.CurrentTerm {
 		nr.becomeFollower(peticion.Term)
@@ -331,8 +332,8 @@ func (nr *NodoRaft) PedirVoto(peticion *ArgsPeticionVoto,
 	}
 	if nr.CurrentTerm == peticion.Term &&
 		(nr.VotedFor == IntNOINICIALIZADO || nr.VotedFor == peticion.CandidateId) &&
-		(peticion.LastLogIndex >= lastLogIndex &&
-			peticion.LastLogTerm == lastLogTerm || lastLogTerm == -1) {
+		((peticion.LastLogIndex >= lastLogIndex &&
+			peticion.LastLogTerm == lastLogTerm) || peticion.LastLogTerm > lastLogTerm) {
 		reply.VoteGranted = true
 		nr.VotedFor = peticion.CandidateId
 		nr.electionResetEvent = time.Now()
@@ -340,7 +341,6 @@ func (nr *NodoRaft) PedirVoto(peticion *ArgsPeticionVoto,
 		reply.VoteGranted = false
 	}
 	reply.Term = nr.CurrentTerm
-	nr.Mux.Unlock()
 
 	return nil
 }
@@ -364,6 +364,7 @@ type Results struct {
 func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 	results *Results) error {
 	nr.Mux.Lock()
+	defer nr.Mux.Unlock()
 	//Si el mandato esta desactualizado (elecciones)
 	if args.Term > nr.CurrentTerm {
 		nr.becomeFollower(args.Term)
@@ -371,17 +372,35 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 	//Si el mandato es menor rechaza la peticion
 	results.Success = false
 	if args.Term == nr.CurrentTerm {
+		if nr.StateNode != F {
+			nr.becomeFollower(args.Term)
+		}
 		nr.electionResetEvent = time.Now()
 		if args.PrevLogIndex == IntNOINICIALIZADO || (len(nr.log) > args.PrevLogIndex &&
 			nr.log[args.PrevLogIndex].Term == args.PrevLogTerm) {
 			results.Success = true
 			if len(args.Entries) > 0 {
-				//Se puede hacer un bucle para comprobar el punto de insercion
-				fmt.Println("Voy a ver que hay hasta args.PrevLogIndex+1", args.PrevLogIndex+1)
-				fmt.Println(nr.log[:args.PrevLogIndex+1])
-				nr.log = append(nr.log[:args.PrevLogIndex+1], args.Entries...)
-				fmt.Println("Se ha almacenado una op en el LOG")
-				fmt.Println(nr.log)
+				logInsertIndex := args.PrevLogIndex + 1
+				newEntriesIndex := 0
+
+				for {
+					if logInsertIndex >= len(nr.log) || newEntriesIndex >= len(args.Entries) {
+						break
+					}
+					if nr.log[logInsertIndex].Term != args.Entries[newEntriesIndex].Term {
+						break
+					}
+					logInsertIndex++
+					newEntriesIndex++
+				}
+				if newEntriesIndex < len(args.Entries) {
+					//Se puede hacer un bucle para comprobar el punto de insercion
+					fmt.Println("Voy a ver que hay hasta args.PrevLogIndex+1", args.PrevLogIndex+1)
+					fmt.Println(nr.log[:args.PrevLogIndex+1])
+					nr.log = append(nr.log[:logInsertIndex], args.Entries[newEntriesIndex:]...)
+					fmt.Println("Se ha almacenado una op en el LOG")
+					fmt.Println(nr.log)
+				}
 			}
 		}
 		//Si se ha actualizado el CommitIndex del lider y mi logger tambien => actualizo mi commit index
@@ -394,9 +413,9 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 				go nr.replicarAlmacen(args.LeaderCommit)
 			}
 		}
+
 		results.Term = nr.CurrentTerm
 	}
-	nr.Mux.Unlock()
 
 	return nil
 }
@@ -455,6 +474,10 @@ func (nr *NodoRaft) enviarPeticionVoto(nodo int, args *ArgsPeticionVoto,
 * si no se reciben mensajes de nadie durante un tiempo.
 **/
 func (nr *NodoRaft) gestionDeLider() {
+	nr.Mux.Lock()
+	nr.VotedFor = IntNOINICIALIZADO
+	nr.StateNode = F
+	nr.Mux.Unlock()
 	// Uso una semilla porque sino genera la misma secuencia de
 	// numeros aleatorios para todos
 	s1 := rand.NewSource(time.Now().UnixNano())
@@ -524,6 +547,14 @@ func (nr *NodoRaft) sendHeartBeat() {
 				&reply, 50*time.Millisecond)
 			if err != nil {
 				fmt.Println("Cant reach node ", i)
+			} else {
+				if !reply.Success {
+					nr.Mux.Lock()
+					if nr.NextIndex[i] > 0 {
+						nr.NextIndex[i] = nr.NextIndex[i] - 1
+					}
+					nr.Mux.Unlock()
+				}
 			}
 		}
 	}
@@ -606,6 +637,9 @@ func (nr *NodoRaft) getLastLogData() (int, int) {
 
 //Funcion encargada de enviar latidos a todos los nodos
 func (nr *NodoRaft) submit(i int) {
+	nr.Mux.Lock()
+	ni := nr.NextIndex[i]
+	nr.Mux.Unlock()
 	done := false
 	for !done {
 		args := nr.makeAppendEntriesArgs(i)
@@ -615,7 +649,7 @@ func (nr *NodoRaft) submit(i int) {
 		if err == nil {
 			nr.Mux.Lock()
 			if reply.Success {
-				nr.checkReply(i, args.Entries, args.PrevLogIndex+1)
+				nr.checkReply(i, args.Entries, ni)
 				done = true
 			} else {
 				if nr.NextIndex[i] > 0 {
@@ -698,7 +732,7 @@ func (nr *NodoRaft) CheckCommits(args int, reply *bool) error {
 func (nr *NodoRaft) replicarAlmacen(leaderCommit int) {
 	nr.Mux.Lock()
 	ni := nr.CommitIndex + 1
-	nr.CommitIndex = leaderCommit
+	nr.CommitIndex = min(leaderCommit, len(nr.log)-1)
 	nr.Mux.Unlock()
 	fmt.Println("Mi nr.CommitIndex: ", ni, " el LeaderCommit: ", leaderCommit)
 	for i := ni; i <= leaderCommit; i++ {
@@ -711,4 +745,11 @@ func (nr *NodoRaft) replicarAlmacen(leaderCommit int) {
 		nr.CanalAplicar <- aplica
 
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
