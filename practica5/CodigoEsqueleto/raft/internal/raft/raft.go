@@ -380,27 +380,7 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 			nr.log[args.PrevLogIndex].Term == args.PrevLogTerm) {
 			results.Success = true
 			if len(args.Entries) > 0 {
-				logInsertIndex := args.PrevLogIndex + 1
-				newEntriesIndex := 0
-
-				for {
-					if logInsertIndex >= len(nr.log) || newEntriesIndex >= len(args.Entries) {
-						break
-					}
-					if nr.log[logInsertIndex].Term != args.Entries[newEntriesIndex].Term {
-						break
-					}
-					logInsertIndex++
-					newEntriesIndex++
-				}
-				if newEntriesIndex < len(args.Entries) {
-					//Se puede hacer un bucle para comprobar el punto de insercion
-					fmt.Println("Voy a ver que hay hasta args.PrevLogIndex+1", args.PrevLogIndex+1)
-					fmt.Println(nr.log[:args.PrevLogIndex+1])
-					nr.log = append(nr.log[:logInsertIndex], args.Entries[newEntriesIndex:]...)
-					fmt.Println("Se ha almacenado una op en el LOG")
-					fmt.Println(nr.log)
-				}
+				nr.completarLog(args)
 			}
 		}
 		//Si se ha actualizado el CommitIndex del lider y mi logger tambien => actualizo mi commit index
@@ -413,11 +393,32 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 				go nr.replicarAlmacen(args.LeaderCommit)
 			}
 		}
-
 		results.Term = nr.CurrentTerm
 	}
-
 	return nil
+}
+
+func (nr *NodoRaft) completarLog(args *ArgAppendEntries) {
+	lastEqIndex := args.PrevLogIndex + 1
+	lastEqEntry := 0
+	// Buscar el indice para insertar los logs
+	// Donde dejan de coincidir los mandatos del log y las entries,
+	// si coinciden todos se inserta al final
+	for {
+		if lastEqIndex >= len(nr.log) || lastEqEntry >= len(args.Entries) {
+			break
+		}
+		if nr.log[lastEqIndex].Term != args.Entries[lastEqEntry].Term {
+			break
+		}
+		lastEqIndex++
+		lastEqEntry++
+	}
+	if lastEqEntry < len(args.Entries) {
+		nr.log = append(nr.log[:lastEqIndex], args.Entries[lastEqEntry:]...)
+		fmt.Println("Se ha almacenado una op en el LOG")
+		fmt.Println(nr.log)
+	}
 }
 
 // ----- Metodos/Funciones a utilizar como clientes
@@ -490,12 +491,10 @@ func (nr *NodoRaft) gestionDeLider() {
 	// es, se incia una votacion.
 	for !eleccion {
 		<-tick.C
-		//nr.mux.Lock()
 		//Se comprueba si el tiempo que ha pasado es > timeout
 		elapsed := time.Since(nr.electionResetEvent)
 		if elapsed >= timeout && nr.StateNode == F {
 			nr.elecciones()
-			//nr.mux.Unlock()
 			eleccion = true
 		}
 	}
@@ -658,11 +657,7 @@ func (nr *NodoRaft) submit(i int) {
 				}
 			}
 			nr.Mux.Unlock()
-
-		} /*else {
-			fmt.Println("Cant reach node ", i, " ", err)
-			done = true
-		}*/
+		}
 	}
 }
 
