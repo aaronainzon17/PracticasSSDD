@@ -229,7 +229,6 @@ func (nr *NodoRaft) someterOperacion(operacion TipoOperacion) (int, int,
 	idLider := nr.IdLider
 	valorADevolver := ""
 
-	// Vuestro codigo aqui
 	nr.Mux.Lock()
 	if nr.StateNode == L {
 		nr.log = append(nr.log, LogEntry{operacion, nr.CurrentTerm})
@@ -364,6 +363,7 @@ type Results struct {
 func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 	results *Results) error {
 	nr.Mux.Lock()
+	defer nr.Mux.Unlock()
 	//Si el mandato esta desactualizado (elecciones)
 	if args.Term > nr.CurrentTerm {
 		nr.becomeFollower(args.Term)
@@ -379,12 +379,7 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 			nr.log[args.PrevLogIndex].Term == args.PrevLogTerm) {
 			results.Success = true
 			if len(args.Entries) > 0 {
-				//Se puede hacer un bucle para comprobar el punto de insercion
-				fmt.Println("Voy a ver que hay hasta args.PrevLogIndex+1", args.PrevLogIndex+1)
-				fmt.Println(nr.log[:args.PrevLogIndex+1])
-				nr.log = append(nr.log[:args.PrevLogIndex+1], args.Entries...)
-				fmt.Println("Se ha almacenado una op en el LOG")
-				fmt.Println(nr.log)
+				nr.completarLog(args)
 			}
 		}
 		//Si se ha actualizado el CommitIndex del lider y mi logger tambien => actualizo mi commit index
@@ -399,9 +394,30 @@ func (nr *NodoRaft) AppendEntries(args *ArgAppendEntries,
 		}
 		results.Term = nr.CurrentTerm
 	}
-	nr.Mux.Unlock()
-
 	return nil
+}
+
+func (nr *NodoRaft) completarLog(args *ArgAppendEntries) {
+	lastEqIndex := args.PrevLogIndex + 1
+	lastEqEntry := 0
+	// Buscar el indice para insertar los logs
+	// Donde dejan de coincidir los mandatos del log y las entries,
+	// si coinciden todos se inserta al final
+	for {
+		if lastEqIndex >= len(nr.log) || lastEqEntry >= len(args.Entries) {
+			break
+		}
+		if nr.log[lastEqIndex].Term != args.Entries[lastEqEntry].Term {
+			break
+		}
+		lastEqIndex++
+		lastEqEntry++
+	}
+	if lastEqEntry < len(args.Entries) {
+		nr.log = append(nr.log[:lastEqIndex], args.Entries[lastEqEntry:]...)
+		fmt.Println("Se ha almacenado una op en el LOG")
+		fmt.Println(nr.log)
+	}
 }
 
 // ----- Metodos/Funciones a utilizar como clientes
@@ -461,6 +477,7 @@ func (nr *NodoRaft) gestionDeLider() {
 	nr.Mux.Lock()
 	nr.VotedFor = IntNOINICIALIZADO
 	nr.StateNode = F
+	mandatoComienzo := nr.CurrentTerm
 	nr.Mux.Unlock()
 	// Uso una semilla porque sino genera la misma secuencia de
 	// numeros aleatorios para todos
@@ -469,17 +486,20 @@ func (nr *NodoRaft) gestionDeLider() {
 	timeout := time.Duration(150+r1.Intn(150)) * time.Millisecond
 	tick := time.NewTicker(20 * time.Millisecond)
 	eleccion := false
+	nuevoMandato := false
 	// Mientras no se haya iniciado una eleccion se comprueba en cada tick si el
 	// tiempo transcurrido desde el ultimo latido es mayor que el timeout, si lo
 	// es, se incia una votacion.
-	for !eleccion {
+	for !eleccion && !nuevoMandato {
 		<-tick.C
-		//nr.mux.Lock()
+
+		if (mandatoComienzo != nr.CurrentTerm) || nr.StateNode != F {
+			nuevoMandato = true
+		}
 		//Se comprueba si el tiempo que ha pasado es > timeout
 		elapsed := time.Since(nr.electionResetEvent)
 		if elapsed >= timeout && nr.StateNode == F {
 			nr.elecciones()
-			//nr.mux.Unlock()
 			eleccion = true
 		}
 	}
@@ -490,7 +510,6 @@ func (nr *NodoRaft) gestionDeLider() {
 * por parametro
 **/
 func (nr *NodoRaft) becomeFollower(term int) {
-	fmt.Println("SEGUIDOR DEL MANDATO: ", term)
 	nr.StateNode = F
 	nr.CurrentTerm = term
 	nr.VotedFor = IntNOINICIALIZADO
@@ -532,6 +551,14 @@ func (nr *NodoRaft) sendHeartBeat() {
 				&reply, 50*time.Millisecond)
 			if err != nil {
 				fmt.Println("Cant reach node ", i)
+			} else {
+				if !reply.Success {
+					nr.Mux.Lock()
+					if nr.NextIndex[i] > 0 {
+						nr.NextIndex[i] = nr.NextIndex[i] - 1
+					}
+					nr.Mux.Unlock()
+				}
 			}
 		}
 	}
@@ -614,6 +641,9 @@ func (nr *NodoRaft) getLastLogData() (int, int) {
 
 //Funcion encargada de enviar latidos a todos los nodos
 func (nr *NodoRaft) submit(i int) {
+	nr.Mux.Lock()
+	ni := nr.NextIndex[i]
+	nr.Mux.Unlock()
 	done := false
 	for !done {
 		args := nr.makeAppendEntriesArgs(i)
@@ -623,7 +653,7 @@ func (nr *NodoRaft) submit(i int) {
 		if err == nil {
 			nr.Mux.Lock()
 			if reply.Success {
-				nr.checkReply(i, args.Entries, args.PrevLogIndex+1)
+				nr.checkReply(i, args.Entries, ni)
 				done = true
 			} else {
 				if nr.NextIndex[i] > 0 {
@@ -632,11 +662,7 @@ func (nr *NodoRaft) submit(i int) {
 				}
 			}
 			nr.Mux.Unlock()
-
-		} /*else {
-			fmt.Println("Cant reach node ", i, " ", err)
-			done = true
-		}*/
+		}
 	}
 }
 
@@ -706,7 +732,7 @@ func (nr *NodoRaft) CheckCommits(args int, reply *bool) error {
 func (nr *NodoRaft) replicarAlmacen(leaderCommit int) {
 	nr.Mux.Lock()
 	ni := nr.CommitIndex + 1
-	nr.CommitIndex = leaderCommit
+	nr.CommitIndex = min(leaderCommit, len(nr.log)-1)
 	nr.Mux.Unlock()
 	fmt.Println("Mi nr.CommitIndex: ", ni, " el LeaderCommit: ", leaderCommit)
 	for i := ni; i <= leaderCommit; i++ {
@@ -719,4 +745,11 @@ func (nr *NodoRaft) replicarAlmacen(leaderCommit int) {
 		nr.CanalAplicar <- aplica
 
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

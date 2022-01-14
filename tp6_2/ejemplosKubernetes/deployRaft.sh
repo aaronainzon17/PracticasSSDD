@@ -1,2 +1,2 @@
-kubectl delete -f mixStatefluset.yaml
-kubectl create -f mixStatefluset.yaml
+kubectl delete -f raft_tests_stateful.yaml
+kubectl create -f raft_tests_stateful.yaml

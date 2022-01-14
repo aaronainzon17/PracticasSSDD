@@ -345,14 +345,6 @@ func (cfg *configDespliegue) SinAcuerdoPorFallos(t *testing.T) {
 	cfg.stopDistributedProcesses()
 
 	fmt.Println(".............", t.Name(), "Superado")
-
-	// Comprometer una entrada
-
-	//  Obtener un lider y, a continuación desconectar 2 de los nodos Raft
-
-	// Comprobar varios acuerdos con 2 réplicas desconectada
-
-	// reconectar lo2 nodos Raft  desconectados y probar varios acuerdos
 }
 
 // Se somete 5 operaciones de forma concurrente -- 3 NODOS RAFT
@@ -500,25 +492,6 @@ func (cfg *configDespliegue) obtenerEstadoRemoto(
 
 	return reply.IdNodo, reply.Mandato, reply.EsLider, reply.IdLider
 }
-
-// start  gestor de vistas; mapa de replicas y maquinas donde ubicarlos;
-// y lista clientes (host:puerto)
-/*func (cfg *configDespliegue) startDistributedProcesses() {
-	//cfg.t.Log("Before starting following distributed processes: ", cfg.nodosRaft)
-
-	for i, endPoint := range cfg.nodosRaft {
-		despliegue.ExecMutipleHosts(EXECREPLICACMD+
-			" "+strconv.Itoa(i)+" "+
-			rpctimeout.HostPortArrayToString(cfg.nodosRaft),
-			[]string{endPoint.Host()}, cfg.cr, PRIVKEYFILE)
-
-		// dar tiempo para se establezcan las replicas
-		//time.Sleep(500 * time.Millisecond)
-	}
-
-	// aproximadamente 500 ms para cada arranque por ssh en portatil
-	time.Sleep(2500 * time.Millisecond)
-}*/
 
 //
 func (cfg *configDespliegue) stopDistributedProcesses() {

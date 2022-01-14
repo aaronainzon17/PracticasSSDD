@@ -1,4 +1,4 @@
-FROM alpine
+FROM scratch
 
 COPY main /usr/local/bin/nodoraft
 

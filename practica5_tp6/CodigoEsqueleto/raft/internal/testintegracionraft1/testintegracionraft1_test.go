@@ -171,10 +171,6 @@ func (cfg *configDespliegue) soloArranqueYparadaTest1(t *testing.T) {
 
 	cfg.t = t // Actualizar la estructura de datos de tests para errores
 
-	// Poner en marcha replicas en remoto con un tiempo de espera incluido
-	//cfg.startDistributedProcesses()
-	//time.Sleep(4 * time.Second)
-
 	// Comprobar estado replica 0
 	cfg.comprobarEstadoRemoto(0, 1, false, -1)
 
@@ -197,14 +193,8 @@ func (cfg *configDespliegue) elegirPrimerLiderTest2(t *testing.T) {
 	fmt.Println(t.Name(), ".....................")
 	cfg.t = t // Actualizar la estructura de datos de tests para errores
 
-	//cfg.startDistributedProcesses()
-	//time.Sleep(4 * time.Second)
-	// Se ha elegido lider ?
 	fmt.Printf("Probando lider en curso\n")
 	cfg.pruebaUnLider(3)
-
-	// Parar réplicas alamcenamiento en remoto
-	//cfg.stopDistributedProcesses() // Parametros
 
 	fmt.Println(".............", t.Name(), "Superado")
 }
@@ -216,24 +206,16 @@ func (cfg *configDespliegue) falloAnteriorElegirNuevoLiderTest3(t *testing.T) {
 	fmt.Println(t.Name(), ".....................")
 	cfg.t = t // Actualizar la estructura de datos de tests para errores
 
-	//cfg.startDistributedProcesses()
-	//time.Sleep(4 * time.Second)
 	fmt.Printf("Lider inicial\n")
 	cfg.pruebaUnLider(3)
 
 	// Desconectar lider
 	cfg.desconectaLider()
-	fmt.Println("Esperando 30s para que se levanten los pods")
+
 	time.Sleep(30 * time.Second)
-	//Se veulve a levantar el nodo
-	//cfg.startOneNodeDistributed(i)
-	//time.Sleep(4 * time.Second)
 
 	fmt.Printf("Comprobar nuevo lider\n")
 	cfg.pruebaUnLider(3)
-
-	// Parar réplicas almacenamiento en remoto
-	//cfg.stopDistributedProcesses() //parametros
 
 	fmt.Println(".............", t.Name(), "Superado")
 }
@@ -244,9 +226,6 @@ func (cfg *configDespliegue) tresOperacionesComprometidasEstable(t *testing.T) {
 
 	fmt.Println(t.Name(), ".....................")
 	cfg.t = t // Actualizar la estructura de datos de tests para errores
-
-	//cfg.startDistributedProcesses()
-	//time.Sleep(4 * time.Second)
 
 	cmds := []raft.TipoOperacion{
 		{Operacion: "leer", Clave: "1"},
@@ -269,12 +248,10 @@ func (cfg *configDespliegue) AcuerdoApesarDeSeguidor(t *testing.T) {
 	fmt.Println(t.Name(), ".....................")
 	cfg.t = t // Actualizar la estructura de datos de tests para errores
 	time.Sleep(120 * time.Second)
-	// Obtener un lider
-	//cfg.startDistributedProcesses()
-	//time.Sleep(4 * time.Second)
-	// Desconectar una de los nodos Raft
+
 	i := cfg.desconectaSeguidor()
 	time.Sleep(500 * time.Millisecond)
+
 	cmds := []raft.TipoOperacion{
 		{Operacion: "escribir", Clave: "1", Valor: "mensaje1"},
 		{Operacion: "escribir", Clave: "2", Valor: "mensaje2"},
@@ -286,7 +263,7 @@ func (cfg *configDespliegue) AcuerdoApesarDeSeguidor(t *testing.T) {
 	// reconectar nodo Raft previamente desconectado y comprobar varios acuerdos
 
 	cfg.startOneNodeDistributed(i)
-	fmt.Println("Esperando 1 minuto para que se levanten los pods")
+	fmt.Println("Reconectando ", i)
 	time.Sleep(120 * time.Second)
 
 	cmds = []raft.TipoOperacion{
@@ -309,8 +286,6 @@ func (cfg *configDespliegue) SinAcuerdoPorFallos(t *testing.T) {
 	fmt.Println(t.Name(), ".....................")
 	cfg.t = t // Actualizar la estructura de datos de tests para errores
 
-	// Obtener un lider
-	//cfg.startDistributedProcesses()
 	time.Sleep(120 * time.Second)
 	// Desconectar una de los nodos Raft
 	nodo1 := cfg.desconectaSeguidor()
@@ -327,8 +302,10 @@ func (cfg *configDespliegue) SinAcuerdoPorFallos(t *testing.T) {
 	cfg.comrprobarComprometidas(2)
 	// reconectar nodo Raft previamente desconectado y comprobar varios acuerdos
 	cfg.startOneNodeDistributed(nodo1)
+	fmt.Println("Reconectando ", nodo1)
 	cfg.startOneNodeDistributed(nodo2)
-	fmt.Println("Esperando 1 minuto para que se levanten los pods")
+	fmt.Println("Reconectando ", nodo2)
+
 	time.Sleep(120 * time.Second)
 
 	cmds = []raft.TipoOperacion{
@@ -352,9 +329,7 @@ func (cfg *configDespliegue) SometerConcurrentementeOperaciones(t *testing.T) {
 	fmt.Println(t.Name(), ".....................")
 	cfg.t = t // Actualizar la estructura de datos de tests para errores
 	time.Sleep(120 * time.Second)
-	// Obtener un lider y, a continuación someter una operacion
-	//cfg.startDistributedProcesses()
-	//time.Sleep(4 * time.Second)
+
 	cmds := []raft.TipoOperacion{
 		{Operacion: "escribir", Clave: "1", Valor: "mensaje1"},
 		{Operacion: "escribir", Clave: "2", Valor: "mensaje2"},
@@ -368,8 +343,6 @@ func (cfg *configDespliegue) SometerConcurrentementeOperaciones(t *testing.T) {
 	}
 	time.Sleep(400 * time.Millisecond)
 	cfg.comrprobarComprometidas(4)
-	// Parar réplicas alamcenamiento en remoto
-	//cfg.stopDistributedProcesses()
 
 	fmt.Println(".............", t.Name(), "Superado")
 }
@@ -455,7 +428,6 @@ func (cfg *configDespliegue) encontrarLider() int {
 			_, _, esLider, _ := cfg.obtenerEstadoRemoto(i)
 			if esLider {
 				lider = i
-				fmt.Println("He encontrado al lider: ", lider)
 				break
 			}
 		}
@@ -491,26 +463,6 @@ func (cfg *configDespliegue) obtenerEstadoRemoto(
 	return reply.IdNodo, reply.Mandato, reply.EsLider, reply.IdLider
 }
 
-// start  gestor de vistas; mapa de replicas y maquinas donde ubicarlos;
-// y lista clientes (host:puerto)
-/*func (cfg *configDespliegue) startDistributedProcesses() {
-	//cfg.t.Log("Before starting following distributed processes: ", cfg.nodosRaft)
-
-	for i, endPoint := range cfg.nodosRaft {
-		despliegue.ExecMutipleHosts(EXECREPLICACMD+
-			" "+strconv.Itoa(i)+" "+
-			rpctimeout.HostPortArrayToString(cfg.nodosRaft),
-			[]string{endPoint.Host()}, cfg.cr, PRIVKEYFILE)
-
-		// dar tiempo para se establezcan las replicas
-		//time.Sleep(500 * time.Millisecond)
-	}
-
-	// aproximadamente 500 ms para cada arranque por ssh en portatil
-	time.Sleep(2500 * time.Millisecond)
-}*/
-
-//
 func (cfg *configDespliegue) stopDistributedProcesses() {
 	var reply raft.Vacio
 
@@ -524,11 +476,11 @@ func (cfg *configDespliegue) stopDistributedProcesses() {
 // Comprobar estado remoto de un nodo con respecto a un estado prefijado
 func (cfg *configDespliegue) comprobarEstadoRemoto(idNodoDeseado int,
 	mandatoDeseado int, esLiderDeseado bool, IdLiderDeseado int) {
-	idNodo, mandato, _, idLider := cfg.obtenerEstadoRemoto(idNodoDeseado)
+	idNodo, _, _, idLider := cfg.obtenerEstadoRemoto(idNodoDeseado)
 
 	//cfg.t.Log("Estado replica 0: ", idNodo, mandato, esLider, idLider, "\n")
 
-	if idNodo != idNodoDeseado || mandato != mandatoDeseado || idLider != IdLiderDeseado {
+	if idNodo != idNodoDeseado || idLider != IdLiderDeseado {
 		cfg.t.Fatalf("Estado incorrecto en replica %d en subtest %s",
 			idNodoDeseado, cfg.t.Name())
 	}

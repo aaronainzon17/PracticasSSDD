@@ -478,6 +478,7 @@ func (nr *NodoRaft) gestionDeLider() {
 	nr.Mux.Lock()
 	nr.VotedFor = IntNOINICIALIZADO
 	nr.StateNode = F
+	mandatoComienzo := nr.CurrentTerm
 	nr.Mux.Unlock()
 	// Uso una semilla porque sino genera la misma secuencia de
 	// numeros aleatorios para todos
@@ -486,11 +487,16 @@ func (nr *NodoRaft) gestionDeLider() {
 	timeout := time.Duration(150+r1.Intn(150)) * time.Millisecond
 	tick := time.NewTicker(20 * time.Millisecond)
 	eleccion := false
+	nuevoMandato := false
 	// Mientras no se haya iniciado una eleccion se comprueba en cada tick si el
 	// tiempo transcurrido desde el ultimo latido es mayor que el timeout, si lo
 	// es, se incia una votacion.
-	for !eleccion {
+	for !eleccion && !nuevoMandato {
 		<-tick.C
+
+		if (mandatoComienzo != nr.CurrentTerm) || nr.StateNode != F {
+			nuevoMandato = true
+		}
 		//Se comprueba si el tiempo que ha pasado es > timeout
 		elapsed := time.Since(nr.electionResetEvent)
 		if elapsed >= timeout && nr.StateNode == F {
